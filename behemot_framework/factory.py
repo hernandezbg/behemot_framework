@@ -507,21 +507,9 @@ class BehemotFactory:
         # Guardar una referencia a self para usarla en las funciones internas
         factory = self
 
-         # Cargar herramientas genéricas del framework
+         # Importar comandos especiales
         try:
-            import app.core.tools.date_tools
-            logger.info("Herramientas genéricas del framework cargadas automáticamente")
-        except ImportError:
-            logger.warning("No se pudieron cargar las herramientas genéricas del framework")
-
-        # Importar herramientas RAG genéricas
-        if factory.config.get("ENABLE_RAG", False):
-            import app.rag.tools
-            logger.info("Herramientas RAG genéricas registradas")
-
-        # Importar comandos especiales
-        try:
-            import behemot_framework.command_handler
+            from behemot_framework.commandos import command_handler
             logger.info("Comandos especiales registrados")
         except ImportError:
             logger.warning("No se pudieron cargar los comandos especiales")
@@ -600,12 +588,7 @@ def create_behemot_app(
     # Inicializar factory con la configuración
     factory = BehemotFactory(config)
     
-    # Cargar herramientas solicitadas
-    if use_tools:
-        if "all" in use_tools:
-            factory.load_all_tools()
-        else:
-            factory.load_tools(use_tools)
+    # Las herramientas se cargan a través del parámetro use_tools en create_behemot_app
     
     # Configurar conectores solicitados
     if enable_telegram:
