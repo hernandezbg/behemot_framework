@@ -206,28 +206,9 @@ class GeminiModel(BaseModel):
                 
                 function_declarations.append(function_declaration)
             
-            # Intentar crear herramientas usando la API nueva
-            try:
-                tools = []
-                for func_decl in function_declarations:
-                    tool = genai.Tool(function_declarations=[
-                        genai.FunctionDeclaration(**func_decl)
-                    ])
-                    tools.append(tool)
-                logger.info(f"✓ Herramientas Gemini creadas exitosamente: {[f['name'] for f in function_declarations]}")
-                return tools
-            except Exception as e:
-                logger.warning(f"No se pudo usar genai.Tool, usando formato de diccionario: {e}")
-                # Fallback a formato de diccionario - también aplicar limpieza aquí
-                cleaned_declarations = []
-                for func_decl in function_declarations:
-                    cleaned_func = {
-                        "name": func_decl["name"],
-                        "description": func_decl["description"],
-                        "parameters": self._clean_schema_for_gemini(func_decl["parameters"])
-                    }
-                    cleaned_declarations.append(cleaned_func)
-                return [{"function_declarations": cleaned_declarations}]
+            # Saltar la API nueva directamente y usar formato de diccionario limpio
+            logger.info("🔧 Usando formato de diccionario para herramientas Gemini (evitando genai.Tool)")
+            return [{"function_declarations": function_declarations}]
                 
         except Exception as e:
             logger.error(f"Error convirtiendo funciones a formato Gemini: {str(e)}")
