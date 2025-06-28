@@ -17,11 +17,21 @@ class Assistant:
         self.modelo = modelo
         self.prompt_sistema = prompt_sistema
         
-        # Obtener la API key del modelo o de la configuración
-        api_key = getattr(modelo, 'api_key', Config.get("GPT_API_KEY"))
+        # Determinar el proveedor del modelo
+        model_provider = Config.get("MODEL_PROVIDER", "openai").lower()
         
-        # Inicializar el filtro de seguridad de LangChain
-        self.safety_filter = LangChainSafetyFilter(api_key=api_key, safety_level=safety_level)
+        # Solo inicializar el filtro de seguridad si estamos usando OpenAI
+        if model_provider in ["openai", "gpt"]:
+            api_key = Config.get("GPT_API_KEY")
+            if api_key:
+                self.safety_filter = LangChainSafetyFilter(api_key=api_key, safety_level=safety_level)
+            else:
+                logger.warning("GPT_API_KEY no configurada. Filtro de seguridad desactivado.")
+                self.safety_filter = None
+        else:
+            # Para otros proveedores, no usar el filtro de OpenAI
+            logger.info(f"Filtro de seguridad desactivado para proveedor: {model_provider}")
+            self.safety_filter = None
 
     async def generar_respuesta(self, chat_id: str, mensaje_usuario: str) -> str:
 
@@ -31,12 +41,13 @@ class Assistant:
             return await CommandHandler.process_command(chat_id, mensaje_usuario)
         
 
-        # Aplicar filtro al mensaje del usuario
-        safety_result = await self.safety_filter.filter_content(mensaje_usuario)
-        
-        if not safety_result["is_safe"]:
-            logger.warning(f"Mensaje de usuario filtrado - Chat {chat_id}: {safety_result['reason']}")
-            mensaje_usuario = safety_result["filtered_content"]
+        # Aplicar filtro al mensaje del usuario solo si está disponible
+        if self.safety_filter:
+            safety_result = await self.safety_filter.filter_content(mensaje_usuario)
+            
+            if not safety_result["is_safe"]:
+                logger.warning(f"Mensaje de usuario filtrado - Chat {chat_id}: {safety_result['reason']}")
+                mensaje_usuario = safety_result["filtered_content"]
 
         # Recupera el historial de la conversación
         conversation = get_conversation(chat_id)
@@ -135,11 +146,12 @@ class Assistant:
                 # Generar respuesta final
                 final_response = self.modelo.generar_respuesta_desde_contexto(conversation)
                 
-                # Aplicar filtro a la respuesta final
-                safety_result = await self.safety_filter.filter_content(final_response)
-                if not safety_result["is_safe"]:
-                    logger.warning(f"Respuesta filtrada - Chat {chat_id}: {safety_result['reason']}")
-                    final_response = safety_result["filtered_content"]
+                # Aplicar filtro a la respuesta final si está disponible
+                if self.safety_filter:
+                    safety_result = await self.safety_filter.filter_content(final_response)
+                    if not safety_result["is_safe"]:
+                        logger.warning(f"Respuesta filtrada - Chat {chat_id}: {safety_result['reason']}")
+                        final_response = safety_result["filtered_content"]
                     
                 # Guardar la respuesta final
                 conversation.append({"role": "assistant", "content": final_response})
@@ -149,10 +161,11 @@ class Assistant:
                 return answer + "\n---SPLIT_MESSAGE---\n" + final_response
             
             # Mensaje normal
-            safety_result = await self.safety_filter.filter_content(answer)
-            if not safety_result["is_safe"]:
-                logger.warning(f"Respuesta filtrada - Chat {chat_id}: {safety_result['reason']}")
-                answer = safety_result["filtered_content"]
+            if self.safety_filter:
+                safety_result = await self.safety_filter.filter_content(answer)
+                if not safety_result["is_safe"]:
+                    logger.warning(f"Respuesta filtrada - Chat {chat_id}: {safety_result['reason']}")
+                    answer = safety_result["filtered_content"]
                 
             conversation.append({"role": "assistant", "content": answer})
             save_conversation(chat_id, conversation)
@@ -177,11 +190,12 @@ class Assistant:
             # Generamos la respuesta final basada en el resultado de la función
             final_response = self.modelo.generar_respuesta_desde_contexto(conversation)
             
-            # Aplicar filtro a la respuesta final
-            safety_result = await self.safety_filter.filter_content(final_response)
-            if not safety_result["is_safe"]:
-                logger.warning(f"Respuesta filtrada - Chat {chat_id}: {safety_result['reason']}")
-                final_response = safety_result["filtered_content"]
+            # Aplicar filtro a la respuesta final si está disponible
+            if self.safety_filter:
+                safety_result = await self.safety_filter.filter_content(final_response)
+                if not safety_result["is_safe"]:
+                    logger.warning(f"Respuesta filtrada - Chat {chat_id}: {safety_result['reason']}")
+                    final_response = safety_result["filtered_content"]
                 
             conversation.append({"role": "assistant", "content": final_response})
             save_conversation(chat_id, conversation)

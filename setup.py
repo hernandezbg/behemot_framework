@@ -22,6 +22,7 @@ setup(
         'faiss-cpu>=1.7.4',
         'tiktoken>=0.5.1',
         'chromadb>=0.4.22',
+        'langchain-chroma>=0.1.0',
         'google-cloud-storage>=2.9.0',
         'google-api-python-client',
         'boto3',

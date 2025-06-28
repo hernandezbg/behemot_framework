@@ -8,8 +8,17 @@ import logging
 import os
 
 from langchain.docstore.document import Document
-from langchain_community.vectorstores import Chroma
 from langchain.schema.embeddings import Embeddings
+
+# Intentar importar la versión nueva de Chroma primero
+try:
+    from langchain_chroma import Chroma
+except ImportError:
+    # Si no está disponible, usar la versión legacy con warning suprimido
+    import warnings
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=DeprecationWarning)
+        from langchain_community.vectorstores import Chroma
 
 
 logger = logging.getLogger(__name__)
