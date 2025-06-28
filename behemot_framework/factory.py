@@ -551,6 +551,15 @@ class BehemotFactory:
         # Agregar eventos de inicio
         @fastapi_app.on_event("startup")
         async def startup_event():
+            # Forzar el nivel de logging para asegurar que se muestre
+            import logging
+            logging.basicConfig(level=logging.INFO, force=True)
+            root_logger = logging.getLogger()
+            root_logger.setLevel(logging.INFO)
+            
+            print("=" * 60)
+            print("🚀 Iniciando aplicación Behemot Framework...")
+            print("=" * 60)
             logger.info("=" * 60)
             logger.info("🚀 Iniciando aplicación Behemot Framework...")
             logger.info("=" * 60)
@@ -558,6 +567,7 @@ class BehemotFactory:
             # 1. Mostrar configuración del modelo
             model_provider = factory.config.get("MODEL_PROVIDER", "openai")
             model_name = factory.config.get("MODEL_NAME", "default")
+            print(f"✓ Modelo configurado: {model_provider} - {model_name}")
             logger.info(f"✓ Modelo configurado: {model_provider} - {model_name}")
             
             # 2. Estado de Redis
@@ -575,20 +585,26 @@ class BehemotFactory:
             
             # 4. Estado de RAG
             if factory.config.get("ENABLE_RAG", False):
+                print("🔍 RAG habilitado - Inicializando...")
                 logger.info("🔍 RAG habilitado - Inicializando...")
                 rag_provider = factory.config.get("RAG_EMBEDDING_PROVIDER", "openai")
                 rag_model = factory.config.get("RAG_EMBEDDING_MODEL", "default")
+                print(f"  → Proveedor de embeddings: {rag_provider}")
+                print(f"  → Modelo de embeddings: {rag_model}")
                 logger.info(f"  → Proveedor de embeddings: {rag_provider}")
                 logger.info(f"  → Modelo de embeddings: {rag_model}")
                 
                 if factory.config.get("RAG_FOLDERS"):
                     folders = factory.config.get("RAG_FOLDERS")
+                    print(f"  → Carpetas a indexar: {folders}")
                     logger.info(f"  → Carpetas a indexar: {folders}")
                     from behemot_framework.startup import initialize_rag
                     await initialize_rag(factory.config)
                 else:
+                    print("  ⚠ No hay carpetas RAG configuradas")
                     logger.warning("  ⚠ No hay carpetas RAG configuradas")
             else:
+                print("ℹ RAG deshabilitado")
                 logger.info("ℹ RAG deshabilitado")
             
             # 5. Mostrar herramientas cargadas
