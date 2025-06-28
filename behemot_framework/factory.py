@@ -517,8 +517,20 @@ class BehemotFactory:
 
         # Importar herramientas RAG genéricas
         if factory.config.get("ENABLE_RAG", False):
-            import behemot_framework.rag.tools
-            logger.info("Herramientas RAG genéricas registradas")
+            try:
+                import behemot_framework.rag.tools
+                logger.info("✓ Herramientas RAG genéricas registradas")
+                
+                # Verificar que las herramientas se registraron correctamente
+                from behemot_framework.tooling import get_tool_definitions
+                tool_defs = get_tool_definitions()
+                rag_tools = [t for t in tool_defs if t['name'] in ['search_documents', 'list_document_collections']]
+                logger.info(f"  → Herramientas RAG disponibles: {[t['name'] for t in rag_tools]}")
+                
+            except Exception as e:
+                logger.error(f"Error al registrar herramientas RAG: {str(e)}")
+        else:
+            logger.info("ℹ RAG deshabilitado - Herramientas RAG no registradas")
 
         # Importar comandos especiales
         try:
@@ -539,19 +551,77 @@ class BehemotFactory:
         # Agregar eventos de inicio
         @fastapi_app.on_event("startup")
         async def startup_event():
-            logger.info("Iniciando aplicación Behemot...")
+            logger.info("=" * 60)
+            logger.info("🚀 Iniciando aplicación Behemot Framework...")
+            logger.info("=" * 60)
             
-            # Si hay carpetas RAG configuradas, ingiere documentos al inicio
-            if factory.config.get("ENABLE_RAG", False) and factory.config.get("RAG_FOLDERS"):
-                from behemot_framework.startup import initialize_rag
-                await initialize_rag(factory.config)
+            # 1. Mostrar configuración del modelo
+            model_provider = factory.config.get("MODEL_PROVIDER", "openai")
+            model_name = factory.config.get("MODEL_NAME", "default")
+            logger.info(f"✓ Modelo configurado: {model_provider} - {model_name}")
             
-            # Mostrar herramientas cargadas
+            # 2. Estado de Redis
+            redis_url = factory.config.get("REDIS_PUBLIC_URL", "")
+            if redis_url:
+                logger.info("✓ Redis configurado para persistencia de contexto")
+            else:
+                logger.warning("⚠ Redis NO configurado - Contexto no persistente")
+            
+            # 3. Estado de seguridad
+            if hasattr(factory.asistente, 'safety_filter') and factory.asistente.safety_filter:
+                logger.info(f"✓ Filtro de seguridad activado (nivel: {factory.config.get('SAFETY_LEVEL', 'medium')})")
+            else:
+                logger.info("ℹ Filtro de seguridad desactivado")
+            
+            # 4. Estado de RAG
+            if factory.config.get("ENABLE_RAG", False):
+                logger.info("🔍 RAG habilitado - Inicializando...")
+                rag_provider = factory.config.get("RAG_EMBEDDING_PROVIDER", "openai")
+                rag_model = factory.config.get("RAG_EMBEDDING_MODEL", "default")
+                logger.info(f"  → Proveedor de embeddings: {rag_provider}")
+                logger.info(f"  → Modelo de embeddings: {rag_model}")
+                
+                if factory.config.get("RAG_FOLDERS"):
+                    folders = factory.config.get("RAG_FOLDERS")
+                    logger.info(f"  → Carpetas a indexar: {folders}")
+                    from behemot_framework.startup import initialize_rag
+                    await initialize_rag(factory.config)
+                else:
+                    logger.warning("  ⚠ No hay carpetas RAG configuradas")
+            else:
+                logger.info("ℹ RAG deshabilitado")
+            
+            # 5. Mostrar herramientas cargadas
             from behemot_framework.tooling import get_tool_definitions
             tool_defs = get_tool_definitions()
-            logger.info(f"Herramientas disponibles: {[t['name'] for t in tool_defs]}")
+            if tool_defs:
+                logger.info(f"🔧 Herramientas disponibles ({len(tool_defs)}):")
+                for tool in tool_defs:
+                    logger.info(f"  → {tool['name']}: {tool.get('description', 'Sin descripción')[:60]}...")
+            else:
+                logger.warning("⚠ No hay herramientas cargadas")
             
-            logger.info("Aplicación iniciada correctamente")
+            # 6. Estado de conectores
+            conectores = []
+            if enable_telegram:
+                conectores.append("Telegram")
+            if enable_api:
+                conectores.append("API REST")
+            if enable_whatsapp:
+                conectores.append("WhatsApp")
+            if enable_google_chat:
+                conectores.append("Google Chat")
+            
+            if conectores:
+                logger.info(f"📡 Conectores activados: {', '.join(conectores)}")
+            
+            # 7. Estado de voz
+            if enable_voice:
+                logger.info("🎤 Procesamiento de voz activado")
+            
+            logger.info("=" * 60)
+            logger.info("✅ Aplicación iniciada correctamente")
+            logger.info("=" * 60)
             
         # Configurar rutas básicas
         @fastapi_app.get("/")

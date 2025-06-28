@@ -61,6 +61,9 @@ class Assistant:
         
         # Obtén las definiciones de las funciones registradas
         functions = get_tool_definitions()
+        
+        # Debug: Mostrar herramientas disponibles
+        logger.info(f"🔧 Herramientas disponibles para el assistant: {[f['name'] for f in functions]}")
 
         try:
             response = self.modelo.generar_respuesta_con_functions(conversation, functions)
@@ -178,7 +181,9 @@ class Assistant:
             function_arguments = function_call.arguments if function_call.arguments else "{}"
             
             # Ejecutar la herramienta
+            logger.info(f"🚀 Ejecutando herramienta: {function_name} con argumentos: {function_arguments}")
             tool_result = await call_tool(function_name, function_arguments)
+            logger.info(f"✅ Resultado de herramienta '{function_name}': {str(tool_result)[:100]}...")
             
             # Agrega el resultado de la función al contexto
             conversation.append({

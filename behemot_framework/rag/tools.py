@@ -22,18 +22,25 @@ async def search_documents(params: dict) -> str:
     folder = params.get("folder", "")
     k = params.get("k", 4)
     
-    logger.info(f"Buscando '{query}' en carpeta '{folder}' con k={k}")
+    logger.info("=" * 40)
+    logger.info(f"🔍 RAG SEARCH_DOCUMENTS EJECUTADO")
+    logger.info(f"  → Query: '{query}'")
+    logger.info(f"  → Folder: '{folder}'")
+    logger.info(f"  → K: {k}")
+    logger.info("=" * 40)
     
     # Usar el gestor RAG para la búsqueda
     result = await RAGManager.query_documents(query, folder, k)
     
     if not result["success"]:
-        logger.error(f"Error en búsqueda: {result['message']}")
+        logger.error(f"❌ Error en búsqueda RAG: {result['message']}")
         return result["message"]
     
     if not result["documents"]:
+        logger.warning("⚠ No se encontraron documentos relevantes")
         return "No encontré información relevante en los documentos."
     
+    logger.info(f"✅ Se encontraron {len(result['documents'])} documentos relevantes")
     return result["formatted_context"]
 
 @tool(name="list_document_collections", description="Lista las colecciones de documentos disponibles", params=[])
