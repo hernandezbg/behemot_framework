@@ -507,7 +507,22 @@ class BehemotFactory:
         # Guardar una referencia a self para usarla en las funciones internas
         factory = self
 
-         # Importar comandos especiales
+         # Cargar herramientas genéricas del framework
+        try:
+            import behemot_framework.core.tools.date_tools
+            logger.info("Herramientas genéricas del framework cargadas automáticamente")
+        except ImportError:
+            logger.warning("No se pudieron cargar las herramientas genéricas del framework")
+
+        # Importar herramientas RAG genéricas
+        if factory.config.get("ENABLE_RAG", False):
+            try:
+                import behemot_framework.rag.tools
+                logger.info("Herramientas RAG genéricas registradas")
+            except ImportError:
+                logger.warning("No se pudieron cargar las herramientas RAG genéricas")
+
+        # Importar comandos especiales
         try:
             from behemot_framework.commandos import command_handler
             logger.info("Comandos especiales registrados")
