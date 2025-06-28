@@ -192,11 +192,14 @@ class GeminiModel(BaseModel):
                 description = func.get("description", "")
                 parameters = func.get("parameters", {})
                 
+                # Limpiar parámetros para Gemini - remover campos incompatibles
+                cleaned_parameters = self._clean_schema_for_gemini(parameters)
+                
                 # Crear la definición de función para Gemini usando diccionarios
                 function_declaration = {
                     "name": name,
                     "description": description,
-                    "parameters": parameters
+                    "parameters": cleaned_parameters
                 }
                 
                 function_declarations.append(function_declaration)
@@ -209,6 +212,7 @@ class GeminiModel(BaseModel):
                         genai.FunctionDeclaration(**func_decl)
                     ])
                     tools.append(tool)
+                logger.info(f"✓ Herramientas Gemini creadas exitosamente: {[f['name'] for f in function_declarations]}")
                 return tools
             except Exception as e:
                 logger.warning(f"No se pudo usar genai.Tool, usando formato de diccionario: {e}")
@@ -286,3 +290,72 @@ class GeminiModel(BaseModel):
         except Exception as e:
             logger.error(f"Error en fallback: {str(e)}")
             return self._create_mock_response("Error al generar respuesta.")
+    
+    def _clean_schema_for_gemini(self, schema: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Limpia un esquema JSON de OpenAI para que sea compatible con Gemini.
+        Remueve campos que Gemini no reconoce.
+        
+        Args:
+            schema: Esquema en formato OpenAI
+            
+        Returns:
+            Esquema limpio compatible con Gemini
+        """
+        if not isinstance(schema, dict):
+            return schema
+            
+        # Campos incompatibles con Gemini que deben ser removidos
+        incompatible_fields = {
+            "additionalProperties",
+            "$schema", 
+            "definitions",
+            "anyOf",
+            "oneOf",
+            "allOf",
+            "not",
+            "if", "then", "else",
+            "dependentRequired",
+            "dependentSchemas",
+            "unevaluatedProperties",
+            "unevaluatedItems",
+            "contentEncoding",
+            "contentMediaType",
+            "examples",
+            "default",  # Gemini puede tener problemas con defaults en algunos casos
+            "const",
+            "contains",
+            "maxContains",
+            "minContains",
+            "uniqueItems",
+            "multipleOf"
+        }
+        
+        cleaned = {}
+        
+        for key, value in schema.items():
+            # Saltar campos incompatibles
+            if key in incompatible_fields:
+                logger.debug(f"Removiendo campo incompatible con Gemini: {key}")
+                continue
+                
+            # Limpiar recursivamente objetos anidados
+            if isinstance(value, dict):
+                if key == "properties":
+                    # Limpiar cada propiedad
+                    cleaned_properties = {}
+                    for prop_name, prop_schema in value.items():
+                        cleaned_properties[prop_name] = self._clean_schema_for_gemini(prop_schema)
+                    cleaned[key] = cleaned_properties
+                else:
+                    cleaned[key] = self._clean_schema_for_gemini(value)
+            elif isinstance(value, list):
+                # Limpiar elementos de array
+                if key == "items" and len(value) > 0 and isinstance(value[0], dict):
+                    cleaned[key] = self._clean_schema_for_gemini(value[0])
+                else:
+                    cleaned[key] = value
+            else:
+                cleaned[key] = value
+        
+        return cleaned
