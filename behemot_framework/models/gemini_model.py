@@ -315,6 +315,8 @@ class GeminiModel(BaseModel):
         if not isinstance(schema, dict):
             return schema
             
+        logger.info(f"🧹 Limpiando esquema para Gemini: {schema}")
+            
         # Campos incompatibles con Gemini que deben ser removidos
         incompatible_fields = {
             "additionalProperties",
@@ -368,4 +370,5 @@ class GeminiModel(BaseModel):
             else:
                 cleaned[key] = value
         
+        logger.info(f"✨ Esquema limpiado resultado: {cleaned}")
         return cleaned
