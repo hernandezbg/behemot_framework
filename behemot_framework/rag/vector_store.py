@@ -42,8 +42,13 @@ class VectorStoreManager:
         logger.info(f"Creando índice Chroma con {len(documents)} documentos en colección '{collection_name}'")
         
         import chromadb
-        
+        from chromadb.config import Settings
+
         # Crear cliente con la nueva configuración recomendada
+        # Deshabilitar telemetría anónima
+        if client_settings is None:
+            client_settings = Settings(anonymized_telemetry=False)
+
         if persist_directory:
             client = chromadb.PersistentClient(
                 path=persist_directory,
@@ -90,12 +95,18 @@ class VectorStoreManager:
         try:
             # Usar la forma recomendada para crear el cliente Chroma
             import chromadb
-            
+            from chromadb.config import Settings
+
+            # Deshabilitar telemetría anónima
+            if client_settings is None:
+                client_settings = Settings(anonymized_telemetry=False)
+
             # Crear argumentos para Chroma
             chroma_args = {
                 "persist_directory": persist_directory,
                 "embedding_function": embeddings,
                 "collection_name": collection_name,
+                "client_settings": client_settings
             }
             
             # Importar directamente de langchain_chroma si está disponible
@@ -134,7 +145,6 @@ class VectorStoreManager:
         
         # Persistir si hay directorio de persistencia configurado
         if vectorstore._persist_directory:
-            vectorstore.persist()
             logger.info(f"Índice Chroma actualizado persistido en {vectorstore._persist_directory}")
             
         return vectorstore
