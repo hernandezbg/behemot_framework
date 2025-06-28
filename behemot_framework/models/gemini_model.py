@@ -252,7 +252,13 @@ class GeminiModel(BaseModel):
         class MockFunctionCall:
             def __init__(self, gemini_function_call):
                 self.name = gemini_function_call.name
-                self.arguments = json.dumps(dict(gemini_function_call.args))
+                # Manejar tanto objetos con 'args' como con 'arguments'
+                if hasattr(gemini_function_call, 'args'):
+                    self.arguments = json.dumps(dict(gemini_function_call.args))
+                elif hasattr(gemini_function_call, 'arguments'):
+                    self.arguments = gemini_function_call.arguments
+                else:
+                    self.arguments = "{}"
         
         class MockResponse:
             def __init__(self, function_call):
@@ -400,6 +406,7 @@ class GeminiModel(BaseModel):
                         def __init__(self, name, args):
                             self.name = name
                             self.arguments = args
+                            # No necesita 'args' attribute para prompt engineering
                     
                     mock_call = MockFunctionCall(tool_name, arguments)
                     return self._create_function_call_response(mock_call, None)
