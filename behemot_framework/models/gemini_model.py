@@ -193,7 +193,9 @@ class GeminiModel(BaseModel):
                 parameters = func.get("parameters", {})
                 
                 # Limpiar parámetros para Gemini - remover campos incompatibles
+                logger.info(f"🔍 Parámetros originales para {name}: {parameters}")
                 cleaned_parameters = self._clean_schema_for_gemini(parameters)
+                logger.info(f"✅ Parámetros limpiados para {name}: {cleaned_parameters}")
                 
                 # Crear la definición de función para Gemini usando diccionarios
                 function_declaration = {
@@ -216,8 +218,16 @@ class GeminiModel(BaseModel):
                 return tools
             except Exception as e:
                 logger.warning(f"No se pudo usar genai.Tool, usando formato de diccionario: {e}")
-                # Fallback a formato de diccionario
-                return [{"function_declarations": function_declarations}]
+                # Fallback a formato de diccionario - también aplicar limpieza aquí
+                cleaned_declarations = []
+                for func_decl in function_declarations:
+                    cleaned_func = {
+                        "name": func_decl["name"],
+                        "description": func_decl["description"],
+                        "parameters": self._clean_schema_for_gemini(func_decl["parameters"])
+                    }
+                    cleaned_declarations.append(cleaned_func)
+                return [{"function_declarations": cleaned_declarations}]
                 
         except Exception as e:
             logger.error(f"Error convirtiendo funciones a formato Gemini: {str(e)}")
@@ -336,7 +346,7 @@ class GeminiModel(BaseModel):
         for key, value in schema.items():
             # Saltar campos incompatibles
             if key in incompatible_fields:
-                logger.debug(f"Removiendo campo incompatible con Gemini: {key}")
+                logger.info(f"🔧 Removiendo campo incompatible con Gemini: {key}")
                 continue
                 
             # Limpiar recursivamente objetos anidados
