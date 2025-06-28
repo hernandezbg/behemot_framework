@@ -51,11 +51,17 @@ class RAGPipeline:
         self.collection_name = collection_name
         self.client_settings = client_settings
         
-        self.embeddings = EmbeddingManager.get_embeddings(
-            provider=embedding_provider,
-            model=embedding_model if embedding_provider == "openai" else None,
-            model_name=embedding_model if embedding_provider == "huggingface" else None,
-        )
+        # Preparar parámetros según el proveedor
+        embedding_params = {"provider": embedding_provider}
+        
+        if embedding_provider == "openai":
+            embedding_params["model"] = embedding_model
+        elif embedding_provider == "huggingface":
+            embedding_params["model_name"] = embedding_model
+        elif embedding_provider in ["google", "gemini"]:
+            embedding_params["model"] = embedding_model
+            
+        self.embeddings = EmbeddingManager.get_embeddings(**embedding_params)
         
         self.vectorstore = None
         if os.path.exists(persist_directory):
