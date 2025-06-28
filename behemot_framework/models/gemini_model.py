@@ -80,15 +80,24 @@ class GeminiModel(BaseModel):
             El objeto de respuesta completo adaptado al formato esperado
         """
         try:
-            # Convertir las funciones del formato OpenAI al formato Gemini
-            gemini_tools = self._convert_functions_to_gemini_format(functions)
-            
-            # Crear el modelo con las funciones
-            model_with_functions = genai.GenerativeModel(
-                model_name=self.model_name,
-                generation_config=self.generation_config,
-                tools=gemini_tools
-            )
+            # Intentar usar function calling nativo de Gemini
+            try:
+                # Convertir las funciones del formato OpenAI al formato Gemini
+                gemini_tools = self._convert_functions_to_gemini_format(functions)
+                
+                # Crear el modelo con las funciones
+                model_with_functions = genai.GenerativeModel(
+                    model_name=self.model_name,
+                    generation_config=self.generation_config,
+                    tools=gemini_tools
+                )
+                use_native_functions = True
+                logger.info("✅ Usando function calling nativo de Gemini")
+            except Exception as e:
+                logger.warning(f"⚠️ Function calling nativo falló, usando prompt engineering: {e}")
+                # Usar el modelo base sin herramientas
+                model_with_functions = self.model
+                use_native_functions = False
             
             # Construir el prompt desde la conversación
             prompt_parts = []
@@ -108,24 +117,43 @@ class GeminiModel(BaseModel):
                     function_name = msg.get("name", "función")
                     prompt_parts.append(f"Resultado de {function_name}: {content}")
             
-            # Agregar instrucción sobre herramientas
-            prompt_parts.append("\nInstrucciones: Si necesitas información que no tienes, DEBES usar las herramientas disponibles. Usa search_documents para buscar información en documentos.")
+            # Agregar instrucciones diferentes según el modo
+            if use_native_functions:
+                prompt_parts.append("\nInstrucciones: Si necesitas información que no tienes, DEBES usar las herramientas disponibles. Usa search_documents para buscar información en documentos.")
+            else:
+                # Prompt engineering para simular function calling
+                tools_descriptions = []
+                for func in functions:
+                    name = func["name"]
+                    desc = func.get("description", "")
+                    tools_descriptions.append(f"- {name}: {desc}")
+                
+                tools_text = "\n".join(tools_descriptions)
+                prompt_parts.append(f"\nHerramientas disponibles:\n{tools_text}")
+                prompt_parts.append("\nSi necesitas información que no tienes, responde EXACTAMENTE en este formato:")
+                prompt_parts.append("USAR_HERRAMIENTA: nombre_herramienta")
+                prompt_parts.append("ARGUMENTOS: {{\"parametro\": \"valor\"}}")
+                
             prompt_parts.append("\nAsistente:")
             
             full_prompt = "\n".join(prompt_parts)
             
-            # Generar respuesta con herramientas
+            # Generar respuesta
             response = model_with_functions.generate_content(full_prompt)
             
-            # Verificar si hay function calls en la respuesta
-            if hasattr(response, 'parts'):
-                for part in response.parts:
-                    if hasattr(part, 'function_call'):
-                        # Adaptar la respuesta al formato esperado por el framework
-                        return self._create_function_call_response(part.function_call, response.text)
-            
-            # Si no hay function calls, crear respuesta normal
-            return self._create_mock_response(response.text.strip())
+            if use_native_functions:
+                # Verificar si hay function calls en la respuesta nativa
+                if hasattr(response, 'parts'):
+                    for part in response.parts:
+                        if hasattr(part, 'function_call'):
+                            # Adaptar la respuesta al formato esperado por el framework
+                            return self._create_function_call_response(part.function_call, response.text)
+                
+                # Si no hay function calls, crear respuesta normal
+                return self._create_mock_response(response.text.strip())
+            else:
+                # Procesar respuesta con prompt engineering
+                return self._process_prompt_engineered_response(response.text.strip(), functions)
             
         except Exception as e:
             logger.error(f"Error en function calling con Gemini: {str(e)}")
@@ -184,6 +212,7 @@ class GeminiModel(BaseModel):
             Lista de herramientas en formato Gemini
         """
         try:
+            logger.info(f"🚀 INICIO - Convirtiendo {len(openai_functions)} funciones a formato Gemini")
             function_declarations = []
             
             for func in openai_functions:
@@ -353,3 +382,45 @@ class GeminiModel(BaseModel):
         
         logger.info(f"✨ Esquema limpiado resultado: {cleaned}")
         return cleaned
+    
+    def _process_prompt_engineered_response(self, response_text: str, functions: List[Dict[str, Any]]) -> Any:
+        """
+        Procesa una respuesta que usa prompt engineering en lugar de function calling nativo.
+        
+        Args:
+            response_text: Texto de respuesta de Gemini
+            functions: Lista de funciones disponibles
+            
+        Returns:
+            Respuesta procesada en formato esperado
+        """
+        try:
+            # Buscar patrones de herramientas en la respuesta
+            if "USAR_HERRAMIENTA:" in response_text:
+                lines = response_text.split('\n')
+                tool_name = None
+                arguments = "{}"
+                
+                for line in lines:
+                    if line.startswith("USAR_HERRAMIENTA:"):
+                        tool_name = line.replace("USAR_HERRAMIENTA:", "").strip()
+                    elif line.startswith("ARGUMENTOS:"):
+                        arguments = line.replace("ARGUMENTOS:", "").strip()
+                
+                if tool_name:
+                    logger.info(f"🔧 Prompt engineering detectó uso de herramienta: {tool_name}")
+                    # Crear un mock function call response
+                    class MockFunctionCall:
+                        def __init__(self, name, args):
+                            self.name = name
+                            self.arguments = args
+                    
+                    mock_call = MockFunctionCall(tool_name, arguments)
+                    return self._create_function_call_response(mock_call, None)
+            
+            # Si no se detectó herramienta, respuesta normal
+            return self._create_mock_response(response_text)
+            
+        except Exception as e:
+            logger.error(f"Error procesando respuesta con prompt engineering: {e}")
+            return self._create_mock_response(response_text)
