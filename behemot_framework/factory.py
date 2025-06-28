@@ -601,22 +601,20 @@ class BehemotFactory:
             else:
                 logger.warning("⚠ No hay herramientas cargadas")
             
-            # 6. Estado de conectores
+            # 6. Estado de conectores - obtenido desde la configuración de la factory
             conectores = []
-            if enable_telegram:
+            if hasattr(factory, 'telegram_connector') and factory.telegram_connector:
                 conectores.append("Telegram")
-            if enable_api:
+            if hasattr(factory, 'api_connector') and factory.api_connector:
                 conectores.append("API REST")
-            if enable_whatsapp:
+            if hasattr(factory, 'whatsapp_connector') and factory.whatsapp_connector:
                 conectores.append("WhatsApp")
-            if enable_google_chat:
-                conectores.append("Google Chat")
             
             if conectores:
                 logger.info(f"📡 Conectores activados: {', '.join(conectores)}")
             
             # 7. Estado de voz
-            if enable_voice:
+            if factory.transcriptor:
                 logger.info("🎤 Procesamiento de voz activado")
             
             logger.info("=" * 60)
