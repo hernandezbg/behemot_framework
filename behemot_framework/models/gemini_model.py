@@ -80,24 +80,10 @@ class GeminiModel(BaseModel):
             El objeto de respuesta completo adaptado al formato esperado
         """
         try:
-            # Intentar usar function calling nativo de Gemini
-            try:
-                # Convertir las funciones del formato OpenAI al formato Gemini
-                gemini_tools = self._convert_functions_to_gemini_format(functions)
-                
-                # Crear el modelo con las funciones
-                model_with_functions = genai.GenerativeModel(
-                    model_name=self.model_name,
-                    generation_config=self.generation_config,
-                    tools=gemini_tools
-                )
-                use_native_functions = True
-                logger.info("✅ Usando function calling nativo de Gemini")
-            except Exception as e:
-                logger.warning(f"⚠️ Function calling nativo falló, usando prompt engineering: {e}")
-                # Usar el modelo base sin herramientas
-                model_with_functions = self.model
-                use_native_functions = False
+            # Por ahora, usar solo prompt engineering hasta resolver los problemas de esquemas
+            logger.info("🔧 Usando SOLO prompt engineering (evitando errores de esquemas)")
+            model_with_functions = self.model
+            use_native_functions = False
             
             # Construir el prompt desde la conversación
             prompt_parts = []
