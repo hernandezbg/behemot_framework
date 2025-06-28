@@ -41,13 +41,14 @@ Aquí es donde le das a tu asistente su "personalidad" y defines qué modelo y h
 1.  Crea una carpeta `config`.
 2.  Dentro de `config`, crea un archivo YAML, por ejemplo, `mi_asistente.yaml`.
 
-**`config/mi_asistente.yaml` (Ejemplo):**
+**`config/mi_asistente.yaml` (Ejemplo con GPT):**
 ```yaml
 VERSION: "1.0.0"
 ASSISTANT_NAME: "AsistenteDelClima"
 ASSISTANT_DESCRIPTION: "Un asistente experto en dar el pronóstico del tiempo."
 
 # Configuración del modelo
+MODEL_PROVIDER: "openai"  # Opciones: openai, gemini
 MODEL_NAME: "gpt-4o-mini"
 MODEL_TEMPERATURE: 0.5
 MODEL_MAX_TOKENS: 150
@@ -64,6 +65,32 @@ ENABLE_RAG: false
 
 # Habilitar voz
 ENABLE_VOICE: true
+```
+
+**`config/mi_asistente_gemini.yaml` (Ejemplo con Gemini):**
+```yaml
+VERSION: "1.0.0"
+ASSISTANT_NAME: "AsistenteGemini"
+ASSISTANT_DESCRIPTION: "Un asistente potenciado por Gemini AI."
+
+# Configuración del modelo
+MODEL_PROVIDER: "gemini"  # Usar Gemini en lugar de OpenAI
+MODEL_NAME: "gemini-1.5-pro"  # o gemini-1.5-flash para respuestas más rápidas
+MODEL_TEMPERATURE: 0.7
+MODEL_MAX_TOKENS: 2048
+
+# Prompt del sistema
+PROMPT_SISTEMA: |
+  Eres un asistente AI útil y amigable potenciado por Gemini.
+  Puedes ayudar con diversas tareas y usar herramientas cuando sea necesario.
+
+# Habilitar características
+ENABLE_RAG: true
+ENABLE_VOICE: true
+
+# Configuración RAG con Gemini Embeddings
+RAG_EMBEDDING_PROVIDER: "google"  # openai, google, huggingface
+RAG_EMBEDDING_MODEL: "models/embedding-001"
 ```
 
 ### Paso 4: Desarrollar las Herramientas Personalizadas
@@ -141,7 +168,11 @@ if __name__ == "__main__":
 
     ```
     # .env
-    GPT_API_KEY="tu_api_key_de_openai"
+    # API Keys según el proveedor que uses
+    GPT_API_KEY="tu_api_key_de_openai"      # Para OpenAI
+    GEMINI_API_KEY="tu_api_key_de_google"   # Para Gemini
+    
+    # Tokens de plataformas
     TELEGRAM_TOKEN="tu_token_de_telegram"
     WEBHOOK_URL="tu_url_de_ngrok_o_servidor"
     REDIS_PUBLIC_URL="tu_url_de_conexion_a_redis"

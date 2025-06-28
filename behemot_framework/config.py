@@ -122,6 +122,8 @@ class Config:
             
             # Configuración de API Keys
             "GPT_API_KEY": os.getenv("GPT_API_KEY", ""),
+            "GEMINI_API_KEY": os.getenv("GEMINI_API_KEY", ""),
+            "ANTHROPIC_API_KEY": os.getenv("ANTHROPIC_API_KEY", ""),
             "TELEGRAM_TOKEN": os.getenv("TELEGRAM_TOKEN", ""),
 
             # Configuración de WhatsApp
@@ -150,7 +152,7 @@ class Config:
             "GCP_BUCKET_NAME": os.getenv("GCP_BUCKET_NAME", ""),
             
             # Configuración RAG avanzada
-            "RAG_EMBEDDING_PROVIDER": os.getenv("RAG_EMBEDDING_PROVIDER", "openai"),
+            "RAG_EMBEDDING_PROVIDER": os.getenv("RAG_EMBEDDING_PROVIDER", "openai"),  # openai, google, huggingface
             "RAG_EMBEDDING_MODEL": os.getenv("RAG_EMBEDDING_MODEL", "text-embedding-3-small"),
             "RAG_PERSIST_DIRECTORY": os.getenv("RAG_PERSIST_DIRECTORY", "chroma_db"),
             "RAG_COLLECTION_NAME": os.getenv("RAG_COLLECTION_NAME", "default_collection"),
@@ -163,6 +165,7 @@ class Config:
             """),
             
             # Modelo a utilizar
+            "MODEL_PROVIDER": os.getenv("MODEL_PROVIDER", "openai"),  # openai, gemini, anthropic
             "MODEL_NAME": os.getenv("MODEL_NAME", "gpt-4o-mini"),
             "MODEL_TEMPERATURE": float(os.getenv("MODEL_TEMPERATURE", "0.7")),
             "MODEL_MAX_TOKENS": int(os.getenv("MODEL_MAX_TOKENS", "150")),

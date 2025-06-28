@@ -11,6 +11,14 @@ import os
 from langchain_openai import OpenAIEmbeddings
 from langchain_community.embeddings import HuggingFaceEmbeddings
 
+# Importar embeddings de Google si están disponibles
+try:
+    import google.generativeai as genai
+    from langchain_google_genai import GoogleGenerativeAIEmbeddings
+    GOOGLE_EMBEDDINGS_AVAILABLE = True
+except ImportError:
+    GOOGLE_EMBEDDINGS_AVAILABLE = False
+
 
 logger = logging.getLogger(__name__)
 
@@ -81,22 +89,77 @@ class EmbeddingManager:
             encode_kwargs=encode_kwargs or {"normalize_embeddings": True},
         )
 
+    @staticmethod
+    def get_google_embeddings(
+        model: str = "models/embedding-001",
+        **kwargs
+    ) -> Any:
+        """
+        Obtiene un modelo de embeddings de Google (Gemini)
+        
+        Args:
+            model: Nombre del modelo de embeddings de Google
+            **kwargs: Parámetros adicionales para el modelo
+            
+        Returns:
+            Modelo de embeddings Google
+        """
+        if not GOOGLE_EMBEDDINGS_AVAILABLE:
+            raise ImportError(
+                "google-generativeai y langchain-google-genai no están instalados. "
+                "Ejecuta: pip install google-generativeai langchain-google-genai"
+            )
+        
+        logger.info(f"Inicializando embeddings de Google: {model}")
+        
+        # Obtener API key de Gemini desde la configuración
+        from behemot_framework.config import Config
+        config = Config.get_config()
+        api_key = config.get("GEMINI_API_KEY")
+        
+        if not api_key:
+            raise ValueError(
+                "GEMINI_API_KEY no está configurada. "
+                "Agrega tu API key de Google AI en el archivo .env"
+            )
+        
+        # Configurar la API key globalmente
+        genai.configure(api_key=api_key)
+        
+        embedding_params = {
+            "model": model,
+            "google_api_key": api_key,
+        }
+        
+        # Añadir parámetros adicionales
+        embedding_params.update(kwargs)
+            
+        return GoogleGenerativeAIEmbeddings(**embedding_params)
+
     @classmethod
     def get_embeddings(cls, provider: str = "openai", **kwargs) -> Any:
         """
         Obtiene un modelo de embeddings basado en el proveedor
         
         Args:
-            provider: Proveedor de embeddings ('openai', 'huggingface')
+            provider: Proveedor de embeddings ('openai', 'huggingface', 'google')
             **kwargs: Parámetros específicos del proveedor
             
         Returns:
             Modelo de embeddings
         """
+        provider = provider.lower()
+        
         if provider == "openai":
             return cls.get_openai_embeddings(**kwargs)
         elif provider == "huggingface":
             return cls.get_huggingface_embeddings(**kwargs)
+        elif provider in ["google", "gemini"]:
+            return cls.get_google_embeddings(**kwargs)
         else:
-            logger.warning(f"Proveedor de embeddings desconocido: {provider}, usando openai")
+            available_providers = ["openai", "huggingface", "google"]
+            logger.warning(
+                f"Proveedor de embeddings '{provider}' no soportado. "
+                f"Proveedores disponibles: {available_providers}. Usando openai."
+            )
             return cls.get_openai_embeddings(**kwargs)

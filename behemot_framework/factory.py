@@ -8,7 +8,7 @@ from typing import List, Dict, Any, Optional, Callable
 from fastapi import FastAPI, Request
 
 from behemot_framework.config import Config, load_config
-from behemot_framework.models.gpt_model import GPTModel
+from behemot_framework.models import ModelFactory
 from behemot_framework.assistants.assistant import Assistant
 from behemot_framework.connectors.telegram_connector import TelegramConnector
 from behemot_framework.connectors.api_connector import ApiConnector
@@ -39,7 +39,8 @@ class BehemotFactory:
         
         
         # Inicializar componentes básicos
-        self.modelo = GPTModel(api_key=config.get("GPT_API_KEY"))
+        # Usar ModelFactory para crear el modelo basado en la configuración
+        self.modelo = ModelFactory.create_model()
         self.asistente = Assistant(
             self.modelo, 
             prompt_sistema=config.get("PROMPT_SISTEMA"),
