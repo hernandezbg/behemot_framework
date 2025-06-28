@@ -3,6 +3,7 @@ import logging
 import json
 from typing import List, Dict, Any
 import google.generativeai as genai
+from google.generativeai.types import content_types
 from .base_model import BaseModel
 from behemot_framework.config import Config
 
@@ -13,7 +14,7 @@ logger = logging.getLogger(__name__)
 class GeminiModel(BaseModel):
     """
     Implementación del modelo Gemini de Google para el framework Behemot.
-    Versión simplificada sin function calling hasta resolver compatibilidad.
+    Soporta todas las capacidades incluyendo function calling.
     """
     
     def __init__(self, api_key: str):
@@ -71,7 +72,6 @@ class GeminiModel(BaseModel):
     def generar_respuesta_con_functions(self, conversation: List[Dict[str, str]], functions: List[Dict[str, Any]]) -> Any:
         """
         Genera una respuesta con soporte para function calling.
-        Por ahora, simula el comportamiento sin usar funciones nativas de Gemini.
         
         Args:
             conversation: Lista de mensajes de la conversación
@@ -81,37 +81,40 @@ class GeminiModel(BaseModel):
             El objeto de respuesta completo adaptado al formato esperado
         """
         try:
-            # Por ahora, ignoramos las funciones y generamos una respuesta normal
-            # Esto es temporal hasta resolver la compatibilidad con function calling
+            # Convertir las funciones del formato OpenAI al formato Gemini
+            gemini_tools = self._convert_functions_to_gemini_format(functions)
             
-            # Construir el prompt desde la conversación
-            prompt_parts = []
+            # Crear el modelo con las funciones
+            model_with_functions = genai.GenerativeModel(
+                model_name=self.model_name,
+                generation_config=self.generation_config,
+                tools=gemini_tools
+            )
+            
+            # Construir el historial de chat para Gemini
+            chat = model_with_functions.start_chat(history=[])
+            
+            # Obtener el último mensaje del usuario
+            last_user_message = None
             system_message = None
             
             for msg in conversation:
-                role = msg["role"]
-                content = msg["content"]
-                
-                if role == "system":
-                    system_message = content
-                elif role == "user":
-                    prompt_parts.append(f"Usuario: {content}")
-                elif role == "assistant":
-                    prompt_parts.append(f"Asistente: {content}")
+                if msg["role"] == "system":
+                    system_message = msg["content"]
+                elif msg["role"] == "user":
+                    last_user_message = msg["content"]
             
-            # Combinar todo el contexto
-            if system_message:
-                full_prompt = f"{system_message}\n\n" + "\n".join(prompt_parts)
+            # Combinar system message con el último mensaje si existe
+            if system_message and last_user_message:
+                prompt = f"{system_message}\n\n{last_user_message}"
             else:
-                full_prompt = "\n".join(prompt_parts)
-            
-            full_prompt += "\nAsistente:"
+                prompt = last_user_message or ""
             
             # Generar respuesta
-            response = self.model.generate_content(full_prompt)
+            response = chat.send_message(prompt)
             
             # Adaptar la respuesta al formato esperado por el framework
-            return self._create_mock_response(response.text.strip())
+            return self._adapt_gemini_response(response, functions)
             
         except Exception as e:
             logger.error(f"Error en function calling con Gemini: {str(e)}")
@@ -158,27 +161,81 @@ class GeminiModel(BaseModel):
             logger.error(f"Error generando respuesta desde contexto: {str(e)}")
             return f"Error en la API de Gemini: {str(e)}"
     
-    def _create_mock_response(self, text_content: str) -> Any:
+    def _convert_functions_to_gemini_format(self, openai_functions: List[Dict[str, Any]]) -> List[Any]:
         """
-        Crea una respuesta mock compatible con el formato OpenAI.
+        Convierte las funciones del formato OpenAI al formato de Gemini.
         
         Args:
-            text_content: El contenido de texto de la respuesta
+            openai_functions: Lista de funciones en formato OpenAI
             
         Returns:
-            Objeto mock que simula la estructura de respuesta de OpenAI
+            Lista de herramientas en formato Gemini
         """
-        class MockChoice:
-            def __init__(self, content):
-                self.message = MockMessage(content)
+        gemini_functions = []
         
-        class MockMessage:
-            def __init__(self, content):
-                self.content = content
-                self.function_call = None
+        for func in openai_functions:
+            # Extraer información de la función
+            name = func["name"]
+            description = func.get("description", "")
+            parameters = func.get("parameters", {})
+            
+            # Crear la definición de función para Gemini
+            # Usar un diccionario simple en lugar de clases específicas
+            function_declaration = {
+                "name": name,
+                "description": description,
+                "parameters": parameters
+            }
+            
+            gemini_functions.append(function_declaration)
         
-        class MockResponse:
-            def __init__(self, content):
-                self.choices = [MockChoice(content)]
+        # Retornar las funciones en el formato esperado por Gemini
+        return [{"function_declarations": gemini_functions}]
+    
+    def _adapt_gemini_response(self, gemini_response, original_functions: List[Dict[str, Any]]) -> Any:
+        """
+        Adapta la respuesta de Gemini al formato esperado por el framework.
         
-        return MockResponse(text_content)
+        Args:
+            gemini_response: Respuesta de Gemini
+            original_functions: Lista original de funciones para referencia
+            
+        Returns:
+            Objeto adaptado al formato del framework
+        """
+        # Crear una respuesta compatible con el formato OpenAI
+        class AdaptedResponse:
+            def __init__(self, gemini_response, functions):
+                self.gemini_response = gemini_response
+                self.functions = functions
+                self.choices = [self._create_choice()]
+            
+            def _create_choice(self):
+                class Choice:
+                    def __init__(self, gemini_response):
+                        self.message = self._create_message(gemini_response)
+                    
+                    def _create_message(self, response):
+                        class Message:
+                            def __init__(self, response):
+                                # Verificar si hay function calls
+                                if hasattr(response, 'parts'):
+                                    for part in response.parts:
+                                        if hasattr(part, 'function_call'):
+                                            # Es una llamada a función
+                                            self.content = None
+                                            self.function_call = {
+                                                "name": part.function_call.name,
+                                                "arguments": json.dumps(dict(part.function_call.args))
+                                            }
+                                            return
+                                
+                                # Es una respuesta de texto normal
+                                self.content = response.text
+                                self.function_call = None
+                        
+                        return Message(response)
+                
+                return Choice(self.gemini_response)
+        
+        return AdaptedResponse(gemini_response, original_functions)
