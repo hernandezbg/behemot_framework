@@ -74,9 +74,10 @@ class GoogleChatConnector:
             if not space_name or not message:
                 return None, None
             
-            # ID único para el mensaje
+            # Para Google Chat, usar solo space_name para mantener contexto consistente
+            # Los threads individuales causan pérdida de contexto entre mensajes
             thread_name = message.get("thread", {}).get("name", "")
-            chat_id = f"{space_name}_{thread_name}" if thread_name else space_name
+            chat_id = space_name  # Usar solo space para mantener contexto entre mensajes
             
             # Primero verificar si hay texto
             if message.get("text"):
@@ -159,13 +160,12 @@ class GoogleChatConnector:
         Procesa la respuesta del asistente para Google Chat.
         
         Args:
-            chat_id: ID del chat (space_name o space_name_thread_name)
+            chat_id: ID del chat (ahora solo space_name para mantener contexto)
             respuesta: Texto de respuesta
         """
-        # Extraer space_name y thread_name del chat_id
-        parts = chat_id.split('_', 1)
-        space_name = parts[0]
-        thread_name = parts[1] if len(parts) > 1 else None
+        # chat_id ahora es solo space_name
+        space_name = chat_id
+        thread_name = None  # No usar thread específico para mantener contexto
         
         # Si la respuesta contiene un separador especial para múltiples mensajes
         if "\n---SPLIT_MESSAGE---\n" in respuesta:
