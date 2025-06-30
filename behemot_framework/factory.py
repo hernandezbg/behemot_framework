@@ -570,12 +570,27 @@ class BehemotFactory:
             print(f"✓ Modelo configurado: {model_provider} - {model_name}")
             logger.info(f"✓ Modelo configurado: {model_provider} - {model_name}")
             
-            # 2. Estado de Redis
+            # 2. Estado de Redis con diagnóstico
             redis_url = factory.config.get("REDIS_PUBLIC_URL", "")
             if redis_url:
-                logger.info("✓ Redis configurado para persistencia de contexto")
+                # Importar y ejecutar diagnóstico
+                from behemot_framework.context import redis_diagnostics
+                redis_status = redis_diagnostics()
+                
+                if redis_status.get("connection_status") and redis_status.get("can_write") and redis_status.get("can_read"):
+                    logger.info("✅ Redis configurado y funcionando correctamente")
+                    logger.info(f"  → URL: {redis_url}")
+                else:
+                    logger.error("❌ Redis configurado pero con problemas de conectividad")
+                    logger.error(f"  → URL: {redis_url}")
+                    logger.error(f"  → Conexión: {'✅' if redis_status.get('connection_status') else '❌'}")
+                    logger.error(f"  → Escritura: {'✅' if redis_status.get('can_write') else '❌'}")
+                    logger.error(f"  → Lectura: {'✅' if redis_status.get('can_read') else '❌'}")
+                    if "error" in redis_status:
+                        logger.error(f"  → Error: {redis_status['error']}")
             else:
                 logger.warning("⚠ Redis NO configurado - Contexto no persistente")
+                logger.warning("  → Configure REDIS_PUBLIC_URL para habilitar persistencia")
             
             # 3. Estado de seguridad
             if hasattr(factory.asistente, 'safety_filter') and factory.asistente.safety_filter:
