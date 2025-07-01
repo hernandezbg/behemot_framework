@@ -108,12 +108,15 @@ REDIS_PUBLIC_URL=redis://localhost:6379
 
 # Telegram (opcional)
 TELEGRAM_TOKEN=
-TELEGRAM_WEBHOOK_URL=
+TELEGRAM_WEBHOOK_URL=https://tu-dominio.com/webhook
 
 # WhatsApp (opcional)
 WHATSAPP_TOKEN=
 WHATSAPP_VERIFY_TOKEN=
-WHATSAPP_WEBHOOK_URL=
+WHATSAPP_WEBHOOK_URL=https://tu-dominio.com/whatsapp-webhook
+
+# API REST - Para plataformas web personalizadas (opcional)
+API_WEBHOOK_URL=https://tu-plataforma-web.com/api
 
 # Google Chat (opcional)
 GC_PROJECT_ID=
