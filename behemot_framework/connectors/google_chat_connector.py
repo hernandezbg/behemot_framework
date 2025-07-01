@@ -2,6 +2,7 @@
 import logging
 import os
 from typing import Optional, Dict, Any, Tuple
+from behemot_framework.utils.markdown_converter import markdown_to_google_chat
 
 logger = logging.getLogger(__name__)
 
@@ -134,9 +135,12 @@ class GoogleChatConnector:
             return False
         
         try:
+            # Convertir Markdown a formato Google Chat
+            texto_formateado = markdown_to_google_chat(texto)
+            
             # Crear el cuerpo del mensaje
             body = {
-                "text": texto
+                "text": texto_formateado
             }
             
             # Si hay un hilo específico, añadirlo al cuerpo
