@@ -135,8 +135,14 @@ class GoogleChatConnector:
             return False
         
         try:
+            # Log del texto original
+            logger.info(f"📝 Texto original (primeros 100 chars): {texto[:100]}...")
+            
             # Convertir Markdown a formato Google Chat
             texto_formateado = markdown_to_google_chat(texto)
+            
+            # Log del texto convertido
+            logger.info(f"✨ Texto formateado (primeros 100 chars): {texto_formateado[:100]}...")
             
             # Crear el cuerpo del mensaje
             body = {

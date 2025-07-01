@@ -480,7 +480,15 @@ class BehemotFactory:
                         texto = mensaje["content"]
                         # Generar respuesta
                         respuesta = await self.asistente.generar_respuesta(str(chat_id), texto)
-                        return {"text": respuesta}
+                        
+                        # Aplicar conversión de Markdown a formato Google Chat
+                        from behemot_framework.utils.markdown_converter import markdown_to_google_chat
+                        respuesta_formateada = markdown_to_google_chat(respuesta)
+                        
+                        logger.info(f"📝 Respuesta original (primeros 100 chars): {respuesta[:100]}...")
+                        logger.info(f"✨ Respuesta formateada (primeros 100 chars): {respuesta_formateada[:100]}...")
+                        
+                        return {"text": respuesta_formateada}
                     
                     elif mensaje["type"] == "audio_url":
                         # Respuesta informativa para mensajes de audio

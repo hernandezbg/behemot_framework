@@ -1,5 +1,8 @@
 # Conversor de Markdown a formato Google Chat
 import re
+import logging
+
+logger = logging.getLogger(__name__)
 
 def markdown_to_google_chat(text: str) -> str:
     """
@@ -12,6 +15,20 @@ def markdown_to_google_chat(text: str) -> str:
     - `código inline`
     - ```código en bloque```
     """
+    
+    logger.debug(f"🔄 Iniciando conversión de Markdown a Google Chat")
+    
+    # Detectar si hay markdown en el texto
+    has_markdown = any([
+        '**' in text,
+        '##' in text,
+        '- ' in text,
+        '```' in text,
+        '[' in text and '](' in text
+    ])
+    
+    if has_markdown:
+        logger.info(f"📋 Markdown detectado en el texto")
     
     # Convertir ** a * para negrita
     text = re.sub(r'\*\*(.*?)\*\*', r'*\1*', text)
