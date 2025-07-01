@@ -61,4 +61,9 @@ setup(
         'Topic :: Scientific/Engineering :: Artificial Intelligence',
     ],
     python_requires='>=3.9',
+    entry_points={
+        'console_scripts': [
+            'behemot-admin=behemot_framework.cli.admin:main',
+        ],
+    },
 )
