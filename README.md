@@ -71,10 +71,10 @@ PROMPT_SISTEMA: |
 # Configuración de seguridad
 SAFETY_LEVEL: "medium"  # low, medium, high
 
-# RAG (Retrieval Augmented Generation)
-ENABLE_RAG: false
-RAG_FOLDERS: []  # Carpetas con documentos para RAG
-RAG_EMBEDDING_PROVIDER: "openai"
+# RAG (Retrieval Augmented Generation) - Conocimiento personalizado
+ENABLE_RAG: true
+RAG_FOLDERS: ["./docs"]  # Carpetas locales, gcp://bucket/path, s3://bucket/key
+RAG_EMBEDDING_PROVIDER: "openai"  # openai, google, huggingface
 ```
 
 ### Crear Herramientas Personalizadas
@@ -104,6 +104,19 @@ app = create_behemot_app(
     use_tools=["mi_herramienta"],  # Agregar aquí
 )
 ```
+
+### Habilitar RAG (Conocimiento Personalizado)
+
+Agrega documentos a tu asistente para que responda basándose en tu contenido:
+
+```yaml
+# En config/mi_asistente.yaml
+ENABLE_RAG: true
+RAG_FOLDERS: ["./docs", "gcp://mi-bucket/documentos", "s3://bucket/archivos"]
+```
+
+**Formatos soportados**: PDF, TXT, Markdown, CSV, URLs
+**El asistente leerá automáticamente** todo el contenido y podrá responder preguntas sobre tus documentos.
 
 ### Habilitar Canales de Comunicación
 
@@ -156,7 +169,7 @@ GC_CLIENT_EMAIL=...
 
 - **🤖 Múltiples Modelos IA**: OpenAI GPT y Google Gemini
 - **📱 Múltiples Canales**: API REST, Telegram, WhatsApp, Google Chat
-- **🧠 RAG Integrado**: Conocimiento personalizado desde documentos
+- **🧠 RAG Integrado**: Lee carpetas locales, GCP, S3, Google Drive automáticamente
 - **🔧 Herramientas Extensibles**: Sistema de plugins simple
 - **🎤 Procesamiento de Voz**: Transcripción automática de audio
 - **🔒 Filtros de Seguridad**: Contenido seguro por defecto
