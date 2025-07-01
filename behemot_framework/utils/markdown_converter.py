@@ -30,8 +30,24 @@ def markdown_to_google_chat(text: str) -> str:
     if has_markdown:
         logger.info(f"📋 Markdown detectado en el texto")
     
-    # Convertir ** a * para negrita
-    text = re.sub(r'\*\*(.*?)\*\*', r'*\1*', text)
+    # Primero, procesar los títulos que están en líneas independientes con **Título:**
+    # para darles un formato especial antes de la conversión general
+    lines = text.split('\n')
+    processed_lines = []
+    
+    for line in lines:
+        # Detectar líneas que son solo un título con formato **Texto:**
+        if re.match(r'^\*\*[^*]+:\*\*\s*$', line.strip()):
+            # Extraer el título y formatearlo de manera especial
+            title = re.sub(r'\*\*([^*]+):\*\*', r'\1', line.strip())
+            processed_lines.append(f"\n▬▬▬ *{title}* ▬▬▬")
+        else:
+            processed_lines.append(line)
+    
+    text = '\n'.join(processed_lines)
+    
+    # Ahora convertir ** a * para negrita en el resto del texto
+    text = re.sub(r'\*\*([^*]+)\*\*', r'*\1*', text)
     
     # Convertir __ a _ para cursiva (pero no interferir con _cursiva_ existente)
     text = re.sub(r'(?<!_)__([^_]+?)__(?!_)', r'_\1_', text)
