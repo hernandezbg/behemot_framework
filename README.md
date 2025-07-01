@@ -1,190 +1,177 @@
-# Guía Rápida para Crear un Nuevo Asistente con Behemot Framework
+# Behemot Framework
+
+**Framework modular para crear asistentes IA multimodales**
 
 La filosofía es simple: **el framework proporciona el motor; tú proporcionas la personalidad (configuración) y las habilidades (herramientas).**
 
----
+## 🚀 Inicio Rápido
 
-### Paso 1: Crear el Directorio del Proyecto y el Entorno Virtual
-
-Primero, crea una nueva carpeta para tu asistente al mismo nivel que `my_assistant_project` y `behemot_framework_package`.
+### Paso 1: Crear el Proyecto
 
 ```bash
-mkdir mi_nuevo_asistente
-cd mi_nuevo_asistente
+# Crear directorio del proyecto
+mkdir mi_asistente
+cd mi_asistente
+
+# Crear entorno virtual
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
 ```
 
-Es **muy recomendable** crear un entorno virtual para aislar las dependencias:
+### Paso 2: Instalar Behemot Framework
 
 ```bash
-# En Windows
-python -m venv .venv
-.\.venv\Scripts\activate
-
-# En macOS/Linux
-python3 -m venv .venv
-source .venv/bin/activate
+pip install git+https://github.com/hernandezbg/behemot_framework.git
 ```
 
-### Paso 2: Instalar el Framework Behemot
-
-Desde el directorio de tu nuevo asistente (`mi_nuevo_asistente`), instala el framework en modo "editable". Esto significa que cualquier cambio que hagas en el código del framework se reflejará inmediatamente en tu nuevo proyecto.
+### Paso 3: Generar Estructura del Proyecto
 
 ```bash
-# Asegúrate de estar en la carpeta mi_nuevo_asistente
-pip install -e ../behemot_framework_package
+behemot-admin startia mi_asistente
 ```
 
-### Paso 3: Crear el Archivo de Configuración (`.yaml`)
+Este comando crea automáticamente:
+- `config/mi_asistente.yaml` - Configuración del asistente
+- `tools/` - Directorio para herramientas personalizadas
+- `main.py` - Punto de entrada principal
+- `.env.example` - Plantilla de variables de entorno
+- `README.md` - Documentación del proyecto
 
-Aquí es donde le das a tu asistente su "personalidad" y defines qué modelo y herramientas usará.
+### Paso 4: Configurar Variables de Entorno
 
-1.  Crea una carpeta `config`.
-2.  Dentro de `config`, crea un archivo YAML, por ejemplo, `mi_asistente.yaml`.
+```bash
+cp .env.example .env
+# Editar .env con tus API keys
+```
 
-**`config/mi_asistente.yaml` (Ejemplo con GPT):**
+### Paso 5: Ejecutar tu Asistente
+
+```bash
+python main.py
+```
+
+¡Tu asistente estará corriendo en http://localhost:8000!
+
+## 🛠️ Personalización Avanzada
+
+### Configuración del Asistente
+
+Edita `config/mi_asistente.yaml` para personalizar tu asistente:
+
 ```yaml
-VERSION: "1.0.0"
-ASSISTANT_NAME: "AsistenteDelClima"
-ASSISTANT_DESCRIPTION: "Un asistente experto en dar el pronóstico del tiempo."
-
 # Configuración del modelo
-MODEL_PROVIDER: "openai"  # Opciones: openai, gemini
+MODEL_PROVIDER: "openai"  # openai, gemini
 MODEL_NAME: "gpt-4o-mini"
-MODEL_TEMPERATURE: 0.5
-MODEL_MAX_TOKENS: 150
 
-# Prompt del sistema: ¡La parte más importante!
+# Prompt del sistema - Define la personalidad de tu asistente
 PROMPT_SISTEMA: |
-  Eres un meteorólogo experto y amigable.
-  Tu única función es dar el pronóstico del tiempo usando la herramienta 'consultar_clima'.
-  Nunca respondas preguntas que no estén relacionadas con el clima.
-  Sé siempre conciso y ve al grano.
+  Eres un asistente especializado en [tu dominio].
+  Siempre eres amable, preciso y útil.
+  
+# Configuración de seguridad
+SAFETY_LEVEL: "medium"  # low, medium, high
 
-# Habilitar RAG (si lo necesitas)
+# RAG (Retrieval Augmented Generation)
 ENABLE_RAG: false
-
-# Habilitar voz
-ENABLE_VOICE: true
+RAG_FOLDERS: []  # Carpetas con documentos para RAG
+RAG_EMBEDDING_PROVIDER: "openai"
 ```
 
-**`config/mi_asistente_gemini.yaml` (Ejemplo con Gemini):**
-```yaml
-VERSION: "1.0.0"
-ASSISTANT_NAME: "AsistenteGemini"
-ASSISTANT_DESCRIPTION: "Un asistente potenciado por Gemini AI."
+### Crear Herramientas Personalizadas
 
-# Configuración del modelo
-MODEL_PROVIDER: "gemini"  # Usar Gemini en lugar de OpenAI
-MODEL_NAME: "gemini-1.5-pro"  # o gemini-1.5-flash para respuestas más rápidas
-MODEL_TEMPERATURE: 0.7
-MODEL_MAX_TOKENS: 2048
+Las herramientas son las "habilidades" de tu asistente. Créalas en el directorio `tools/`:
 
-# Prompt del sistema
-PROMPT_SISTEMA: |
-  Eres un asistente AI útil y amigable potenciado por Gemini.
-  Puedes ayudar con diversas tareas y usar herramientas cuando sea necesario.
-
-# Habilitar características
-ENABLE_RAG: true
-ENABLE_VOICE: true
-
-# Configuración RAG con Gemini Embeddings
-RAG_EMBEDDING_PROVIDER: "google"  # openai, google, huggingface
-RAG_EMBEDDING_MODEL: "models/embedding-001"
-```
-
-### Paso 4: Desarrollar las Herramientas Personalizadas
-
-Estas son las "habilidades" de tu asistente.
-
-1.  Crea una carpeta `tools`.
-2.  Dentro de `tools`, crea un archivo Python para cada herramienta. No olvides el archivo `__init__.py` en la carpeta `tools`.
-
-**`tools/consultar_clima.py` (Ejemplo):**
+**`tools/mi_herramienta.py`:**
 ```python
 from behemot_framework.tooling import tool, Param
 
 @tool(
-    name="consultar_clima",
-    description="Consulta el clima actual para una ciudad específica.",
-    params=[
-        Param(name="ciudad", type_="string", description="El nombre de la ciudad.", required=True)
+    "mi_herramienta",
+    "Descripción de lo que hace la herramienta",
+    [
+        Param("parametro", "string", "Descripción del parámetro", required=True)
     ]
 )
-def consultar_clima(args):
-    ciudad = args.get("ciudad")
-    if not ciudad:
-        return "Por favor, especifica una ciudad."
-    
-    # Aquí iría la lógica real para consultar una API del clima
-    # Por ahora, devolvemos un resultado simulado.
-    return f"El clima en {ciudad} es soleado con 25°C."
-
+async def mi_herramienta(parametro: str):
+    # Tu lógica aquí
+    return f"Resultado procesando: {parametro}"
 ```
 
-### Paso 5: Crear el Punto de Entrada (`main.py`)
-
-Este archivo une todo: carga la configuración, activa los canales y le dice al framework qué herramientas usar.
-
-Crea un archivo `main.py` en la raíz de `mi_nuevo_asistente`.
-
-**`main.py`:**
+Luego agrégala a `main.py`:
 ```python
-import logging
-import uvicorn
-from behemot_framework.factory import create_behemot_app
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# Crear la aplicación Behemot para el nuevo asistente
 app = create_behemot_app(
-    # Activa los canales que necesites
-    enable_api=True,
-    enable_telegram=True,
-    
-    # Especifica la ruta a TU archivo de configuración
-    config_path="config/mi_asistente.yaml",
-    
-    # Especifica la lista de herramientas que quieres cargar
-    use_tools=["consultar_clima"]
+    # ... otras configuraciones
+    use_tools=["mi_herramienta"],  # Agregar aquí
 )
-
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
 ```
 
-### Paso 6: Gestionar Dependencias y Variables de Entorno
+### Habilitar Canales de Comunicación
 
-1.  **`requirements.txt`**: Crea este archivo para que otros puedan instalar las dependencias de tu proyecto fácilmente.
+En `main.py`, activa los canales que necesites:
 
-    ```
-    # requirements.txt
-    -e ../behemot_framework_package
-    # Aquí puedes añadir otras dependencias que tus herramientas necesiten, ej: requests
-    ```
+```python
+app = create_behemot_app(
+    enable_api=True,          # API REST
+    enable_telegram=True,     # Bot de Telegram
+    enable_whatsapp=True,     # WhatsApp Business
+    enable_google_chat=True,  # Google Chat
+    enable_voice=True,        # Procesamiento de voz
+    config_path="config/mi_asistente.yaml",
+)
+```
 
-2.  **`.env`**: Crea este archivo en la raíz de `mi_nuevo_asistente` para guardar tus secretos.
+### Configurar Variables de Entorno
 
-    ```
-    # .env
-    # API Keys según el proveedor que uses
-    GPT_API_KEY="tu_api_key_de_openai"      # Para OpenAI
-    GEMINI_API_KEY="tu_api_key_de_google"   # Para Gemini
-    
-    # Tokens de plataformas
-    TELEGRAM_TOKEN="tu_token_de_telegram"
-    WEBHOOK_URL="tu_url_de_ngrok_o_servidor"
-    REDIS_PUBLIC_URL="tu_url_de_conexion_a_redis"
-    # ...y cualquier otra clave que necesites
-    ```
-
-### Paso 7: ¡Ejecutar tu Nuevo Asistente!
-
-Con todos los archivos en su lugar y el entorno virtual activado, simplemente ejecuta Uvicorn:
+Edita tu archivo `.env`:
 
 ```bash
-uvicorn main:app --reload
+# OpenAI
+GPT_API_KEY=sk-...
+
+# Google Gemini (opcional)
+GEMINI_API_KEY=AI...
+
+# Redis para persistencia (opcional)
+REDIS_PUBLIC_URL=redis://localhost:6379
+
+# Telegram (opcional)
+TELEGRAM_TOKEN=...
+TELEGRAM_WEBHOOK_URL=...
+
+# WhatsApp Business (opcional)
+WHATSAPP_TOKEN=...
+WHATSAPP_VERIFY_TOKEN=...
+
+# Google Chat (opcional)
+GC_PROJECT_ID=...
+GC_PRIVATE_KEY=...
+GC_CLIENT_EMAIL=...
 ```
 
-¡Y eso es todo! Ahora tendrás un nuevo asistente funcionando, completamente separado del proyecto `CursoriaAI`, pero utilizando el mismo motor del framework Behemot.
+## 🌟 Características
+
+- **🤖 Múltiples Modelos IA**: OpenAI GPT y Google Gemini
+- **📱 Múltiples Canales**: API REST, Telegram, WhatsApp, Google Chat
+- **🧠 RAG Integrado**: Conocimiento personalizado desde documentos
+- **🔧 Herramientas Extensibles**: Sistema de plugins simple
+- **🎤 Procesamiento de Voz**: Transcripción automática de audio
+- **🔒 Filtros de Seguridad**: Contenido seguro por defecto
+- **💾 Persistencia de Contexto**: Conversaciones continuas con Redis
+- **📊 Diagnósticos**: Monitoreo automático de componentes
+
+## 📚 Documentación Adicional
+
+Para casos de uso avanzados, configuraciones especiales y ejemplos completos, consulta la documentación en el repositorio.
+
+## 🤝 Contribuir
+
+¡Las contribuciones son bienvenidas! Por favor:
+
+1. Haz fork del repositorio
+2. Crea una rama para tu feature
+3. Haz commit de tus cambios
+4. Abre un Pull Request
+
+## 📄 Licencia
+
+Este proyecto está bajo la Licencia MIT. Ver el archivo `LICENSE` para más detalles.
