@@ -27,13 +27,13 @@ class GradioConnector:
         self.transcriptor = transcriptor
         self.interface = None
         
-    async def process_message(self, message: str, history: List[Tuple[str, str]]) -> Tuple[str, List[Tuple[str, str]]]:
+    async def process_message(self, message: str, history: List[Dict[str, str]]) -> Tuple[str, List[Dict[str, str]]]:
         """
         Procesa un mensaje del usuario y actualiza el historial.
         
         Args:
             message: Mensaje del usuario
-            history: Historial de conversación [(user, assistant), ...]
+            history: Historial de conversación [{"role": "user", "content": "..."}, ...]
             
         Returns:
             Tupla con ("", historial_actualizado)
@@ -46,24 +46,24 @@ class GradioConnector:
         
         try:
             # Agregar mensaje del usuario al historial
-            history.append((message, None))
+            history.append({"role": "user", "content": message})
             
             # Generar respuesta del asistente
             logger.info(f"Procesando mensaje en Gradio: {message[:50]}...")
             response = await self.assistant.generar_respuesta(chat_id, message)
             
-            # Actualizar el último elemento del historial con la respuesta
-            history[-1] = (message, response)
+            # Agregar respuesta del asistente al historial
+            history.append({"role": "assistant", "content": response})
             
             logger.info(f"Respuesta generada: {response[:50]}...")
             
         except Exception as e:
             logger.error(f"Error procesando mensaje: {e}", exc_info=True)
-            history[-1] = (message, f"❌ Error: {str(e)}")
+            history.append({"role": "assistant", "content": f"❌ Error: {str(e)}"})
             
         return "", history
     
-    async def process_audio(self, audio_path: str, history: List[Tuple[str, str]]) -> Tuple[None, str, List[Tuple[str, str]]]:
+    async def process_audio(self, audio_path: str, history: List[Dict[str, str]]) -> Tuple[None, str, List[Dict[str, str]]]:
         """
         Procesa un archivo de audio, lo transcribe y envía como mensaje.
         
@@ -88,7 +88,8 @@ class GradioConnector:
                 
         except Exception as e:
             logger.error(f"Error procesando audio: {e}", exc_info=True)
-            history.append(("🎤 [Audio]", f"❌ Error transcribiendo: {str(e)}"))
+            history.append({"role": "user", "content": "🎤 [Audio]"})
+            history.append({"role": "assistant", "content": f"❌ Error transcribiendo: {str(e)}"})
             
         return None, "", history
     
