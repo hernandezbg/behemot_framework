@@ -146,9 +146,11 @@ app = create_behemot_app(
 )
 ```
 
-Esto creará una interfaz web tipo WhatsApp en http://localhost:7860 con:
-- 💬 **Chat estilo WhatsApp** - Interfaz familiar y minimalista
+Esto creará una interfaz web en http://localhost:7860 con:
+- 💬 **Chat interactivo con tema oscuro** - Interfaz moderna y elegante
 - 🎤 **Entrada de voz** - Si `enable_voice=True`
+- 🔧 **Panel de herramientas** - Ve las herramientas disponibles
+- ⚙️ **Configuración** - Revisa la configuración actual
 - 🌐 **Compartir públicamente** - Configura `GRADIO_SHARE=true` para obtener URL pública
 
 #### Configurar acceso público (opcional)
