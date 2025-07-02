@@ -260,36 +260,38 @@ class GradioConnector:
         """
         self.interface = self.create_interface()
         
-        # Intentar encontrar un puerto disponible
-        import socket
+        logger.info(f"🚀 Lanzando interfaz de prueba local en puerto {port}")
+        logger.info(f"🌐 Accede a http://localhost:{port}")
         
-        def find_free_port(start_port):
-            """Encuentra un puerto disponible empezando desde start_port"""
-            for test_port in range(start_port, start_port + 10):
+        # Usar try_launch con rango de puertos
+        try:
+            self.interface.launch(
+                server_port=port,
+                share=share,
+                server_name="0.0.0.0",
+                quiet=False,
+                show_error=True,
+                prevent_thread_lock=True,
+                inbrowser=False
+            )
+        except Exception as e:
+            # Si falla el puerto, intentar con otros puertos
+            logger.warning(f"⚠️ Puerto {port} ocupado, buscando puerto disponible...")
+            for test_port in range(port + 1, port + 10):
                 try:
-                    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                        s.bind(('localhost', test_port))
-                        return test_port
-                except OSError:
+                    logger.info(f"🔄 Intentando puerto {test_port}")
+                    self.interface.launch(
+                        server_port=test_port,
+                        share=share,
+                        server_name="0.0.0.0",
+                        quiet=False,
+                        show_error=True,
+                        prevent_thread_lock=True,
+                        inbrowser=False
+                    )
+                    logger.info(f"✅ Interfaz iniciada en puerto {test_port}")
+                    logger.info(f"🌐 Accede a http://localhost:{test_port}")
+                    return
+                except Exception:
                     continue
-            return None
-        
-        # Buscar puerto disponible
-        available_port = find_free_port(port)
-        if available_port is None:
-            logger.error(f"❌ No se pudo encontrar un puerto disponible desde {port}")
-            return
-            
-        if available_port != port:
-            logger.warning(f"⚠️ Puerto {port} ocupado, usando puerto {available_port}")
-        
-        logger.info(f"🚀 Lanzando interfaz de prueba local en puerto {available_port}")
-        logger.info(f"🌐 Accede a http://localhost:{available_port}")
-        
-        self.interface.launch(
-            server_port=available_port,
-            share=share,
-            server_name="0.0.0.0",
-            quiet=False,
-            show_error=True
-        )
+            logger.error(f"❌ No se pudo encontrar un puerto disponible")
