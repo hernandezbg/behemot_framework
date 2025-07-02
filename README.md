@@ -146,11 +146,23 @@ app = create_behemot_app(
 )
 ```
 
-Esto creará una interfaz web en http://localhost:7860 con:
-- 💬 **Chat interactivo** - Prueba conversaciones
+Esto creará una interfaz web tipo WhatsApp en http://localhost:7860 con:
+- 💬 **Chat estilo WhatsApp** - Interfaz familiar y minimalista
 - 🎤 **Entrada de voz** - Si `enable_voice=True`
-- 🔧 **Panel de herramientas** - Ve las herramientas disponibles
-- ⚙️ **Configuración** - Revisa la configuración actual
+- 🌐 **Compartir públicamente** - Configura `GRADIO_SHARE=true` para obtener URL pública
+
+#### Configurar acceso público (opcional)
+
+```yaml
+# En config/mi_asistente.yaml
+GRADIO_SHARE: true
+```
+
+O con variable de entorno:
+```bash
+export GRADIO_SHARE=true
+python main.py
+```
 
 ### Configurar Variables de Entorno
 

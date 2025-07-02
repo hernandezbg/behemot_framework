@@ -172,6 +172,9 @@ class Config:
             
             # Lista de herramientas a cargar por defecto
             "DEFAULT_TOOLS": [],
+            
+            # Configuración de Gradio
+            "GRADIO_SHARE": os.getenv("GRADIO_SHARE", "false").lower() in ("true", "1", "yes"),
         }
 
     @classmethod

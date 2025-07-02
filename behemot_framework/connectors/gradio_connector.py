@@ -4,6 +4,7 @@ import gradio as gr
 from typing import List, Tuple, Optional, Dict, Any
 import asyncio
 from datetime import datetime
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -150,82 +151,181 @@ class GradioConnector:
     
     def create_interface(self) -> gr.Blocks:
         """
-        Crea la interfaz Gradio.
+        Crea la interfaz Gradio con estilo WhatsApp.
         
         Returns:
             Interfaz Gradio configurada
         """
-        with gr.Blocks(title="Behemot Framework - Test Local", theme=gr.themes.Soft()) as interface:
-            gr.Markdown("# 🤖 Behemot Framework - Interfaz de Prueba Local")
-            gr.Markdown("Prueba tu asistente de forma interactiva antes de desplegarlo.")
-            
-            with gr.Tab("💬 Chat"):
-                chatbot = gr.Chatbot(
-                    label="Conversación",
-                    height=400,
-                    show_label=True,
-                    container=True,
-                    type="messages"
-                )
-                
-                with gr.Row():
-                    msg = gr.Textbox(
-                        label="Mensaje",
-                        placeholder="Escribe tu mensaje aquí...",
-                        lines=2,
-                        scale=4
-                    )
-                    submit = gr.Button("Enviar", variant="primary", scale=1)
-                
-                # Audio input (si está habilitado)
-                if self.transcriptor:
-                    with gr.Row():
-                        audio = gr.Audio(
-                            sources=["microphone", "upload"],
-                            type="filepath",
-                            label="🎤 Mensaje de voz (opcional)"
-                        )
-                
-                # Clear button
-                clear = gr.Button("🗑️ Limpiar conversación", variant="secondary")
-                
-                # Ejemplos
-                gr.Examples(
-                    examples=[
-                        "Hola, ¿cómo estás?",
-                        "¿Qué herramientas tienes disponibles?",
-                        "¿Cuál es tu propósito?",
-                    ],
-                    inputs=msg,
-                    label="Ejemplos de mensajes"
-                )
-                
-            with gr.Tab("🔧 Herramientas"):
-                tools_info = gr.Markdown(self.get_tools_info())
-                
-            with gr.Tab("⚙️ Configuración"):
-                config_info = gr.Markdown(self.get_config_info())
-                
-            with gr.Tab("📖 Ayuda"):
-                gr.Markdown("""
-                ### 🚀 Cómo usar esta interfaz:
-                
-                1. **Chat**: Escribe mensajes o graba audio para interactuar con el asistente
-                2. **Herramientas**: Ve las herramientas disponibles para el asistente
-                3. **Configuración**: Revisa la configuración actual del sistema
-                
-                ### 🎯 Tips:
-                - Prueba las herramientas disponibles pidiendo al asistente que las use
-                - Si RAG está habilitado, pregunta sobre tus documentos
-                - Los mensajes de voz se transcriben automáticamente (si está habilitado)
-                
-                ### ⚠️ Nota:
-                Esta es una interfaz de prueba local. Para producción, usa los conectores
-                de Telegram, WhatsApp, Google Chat o API REST.
+        # CSS personalizado para estilo WhatsApp
+        custom_css = """
+        .gradio-container {
+            max-width: 500px !important;
+            margin: 0 auto !important;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+        }
+        
+        /* Header estilo WhatsApp */
+        .header-container {
+            background-color: #075E54 !important;
+            color: white !important;
+            padding: 16px !important;
+            border-radius: 0 !important;
+            margin: -20px -20px 0 -20px !important;
+        }
+        
+        .header-container h1 {
+            margin: 0 !important;
+            font-size: 20px !important;
+            font-weight: 500 !important;
+        }
+        
+        .header-container p {
+            margin: 4px 0 0 0 !important;
+            font-size: 14px !important;
+            opacity: 0.9 !important;
+        }
+        
+        /* Área de chat */
+        .chat-container {
+            background-color: #E5DDD5 !important;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Cg fill-opacity='0.03'%3E%3Cpolygon fill='%23000' points='50 0 60 40 100 50 60 60 50 100 40 60 0 50 40 40'/%3E%3C/g%3E%3C/svg%3E") !important;
+            min-height: 500px !important;
+            padding: 10px !important;
+        }
+        
+        /* Mensajes */
+        .message {
+            max-width: 70% !important;
+            word-wrap: break-word !important;
+        }
+        
+        .user-message {
+            background-color: #DCF8C6 !important;
+            margin-left: auto !important;
+            border-radius: 7px 7px 0 7px !important;
+        }
+        
+        .bot-message {
+            background-color: white !important;
+            margin-right: auto !important;
+            border-radius: 7px 7px 7px 0 !important;
+        }
+        
+        /* Input área */
+        .input-container {
+            background-color: #F0F0F0 !important;
+            padding: 10px !important;
+            margin: 0 -20px -20px -20px !important;
+        }
+        
+        .input-row {
+            display: flex !important;
+            gap: 8px !important;
+            align-items: flex-end !important;
+        }
+        
+        /* Botón de enviar estilo WhatsApp */
+        .send-button {
+            background-color: #25D366 !important;
+            color: white !important;
+            border: none !important;
+            border-radius: 50% !important;
+            width: 48px !important;
+            height: 48px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            cursor: pointer !important;
+            transition: background-color 0.2s !important;
+        }
+        
+        .send-button:hover {
+            background-color: #22C35E !important;
+        }
+        
+        /* Input de texto */
+        .message-input {
+            flex: 1 !important;
+            border: 1px solid #DDD !important;
+            border-radius: 24px !important;
+            padding: 10px 15px !important;
+            font-size: 16px !important;
+            background-color: white !important;
+        }
+        
+        /* Ocultar labels */
+        label {
+            display: none !important;
+        }
+        
+        /* Ajustar chatbot */
+        .chatbot {
+            border: none !important;
+            shadow: none !important;
+        }
+        """
+        
+        with gr.Blocks(
+            title="Behemot Chat", 
+            theme=gr.themes.Base(),
+            css=custom_css
+        ) as interface:
+            # Header estilo WhatsApp
+            with gr.Column(elem_classes="header-container"):
+                gr.HTML("""
+                    <h1>🤖 Behemot Assistant</h1>
+                    <p>En línea</p>
                 """)
             
+            # Área de chat
+            with gr.Column(elem_classes="chat-container"):
+                chatbot = gr.Chatbot(
+                    label="",
+                    height=500,
+                    show_label=False,
+                    container=False,
+                    type="messages",
+                    elem_classes="chatbot",
+                    show_copy_button=True,
+                    bubble_full_width=False
+                )
+            
+            # Área de input
+            with gr.Column(elem_classes="input-container"):
+                with gr.Row(elem_classes="input-row"):
+                    # Audio button (si está habilitado)
+                    if self.transcriptor:
+                        audio = gr.Audio(
+                            sources=["microphone"],
+                            type="filepath",
+                            label="",
+                            show_label=False,
+                            container=False,
+                            interactive=True,
+                            elem_classes="audio-input"
+                        )
+                    
+                    # Input de mensaje
+                    msg = gr.Textbox(
+                        label="",
+                        placeholder="Escribe un mensaje",
+                        lines=1,
+                        max_lines=3,
+                        show_label=False,
+                        container=False,
+                        elem_classes="message-input",
+                        autofocus=True
+                    )
+                    
+                    # Botón de enviar con ícono
+                    submit = gr.Button(
+                        value="➤",
+                        elem_classes="send-button",
+                        variant="primary"
+                    )
+            
             # Event handlers
-            submit_event = submit.click(
+            submit.click(
                 fn=self.process_message,
                 inputs=[msg, chatbot],
                 outputs=[msg, chatbot],
@@ -247,22 +347,36 @@ class GradioConnector:
                     queue=False
                 )
             
-            clear.click(lambda: ([], ""), outputs=[chatbot, msg], queue=False)
-            
         return interface
     
-    def launch(self, port: int = 7860, share: bool = False):
+    def launch(self, port: int = 7860, share: bool = None):
         """
         Lanza la interfaz Gradio.
         
         Args:
             port: Puerto para la interfaz (default: 7860)
-            share: Si crear un link público temporal
+            share: Si crear un link público temporal. Si es None, lee de configuración
         """
+        from behemot_framework.config import Config
+        
+        # Determinar si compartir públicamente
+        if share is None:
+            # Primero buscar en variables de entorno
+            share_env = os.getenv('GRADIO_SHARE', '').lower()
+            if share_env in ['true', '1', 'yes']:
+                share = True
+            elif share_env in ['false', '0', 'no']:
+                share = False
+            else:
+                # Si no está en env, buscar en configuración
+                share = Config.get('GRADIO_SHARE', False)
+        
         self.interface = self.create_interface()
         
         logger.info(f"🚀 Lanzando interfaz de prueba local en puerto {port}")
         logger.info(f"🌐 Accede a http://localhost:{port}")
+        if share:
+            logger.info("🔗 Se creará un link público temporal para compartir")
         
         # Usar try_launch con rango de puertos
         try:

@@ -538,7 +538,7 @@ class BehemotFactory:
                     time.sleep(3)
                     
                     # Lanzar la interfaz Gradio
-                    gradio_connector.launch(port=7860, share=False)
+                    gradio_connector.launch(port=7860)
                     
                 except Exception as e:
                     logger.error(f"Error al lanzar interfaz Gradio: {e}", exc_info=True)
