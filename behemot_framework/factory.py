@@ -512,6 +512,10 @@ class BehemotFactory:
         Configura la interfaz de prueba local usando Gradio.
         Ejecuta la interfaz en un hilo separado para no bloquear FastAPI.
         """
+        # Evitar múltiples inicializaciones
+        if hasattr(self, '_gradio_initialized') and self._gradio_initialized:
+            return
+            
         try:
             from behemot_framework.connectors.gradio_connector import GradioConnector
             from behemot_framework.tooling import get_tool_definitions
@@ -531,7 +535,7 @@ class BehemotFactory:
                 """Función para lanzar Gradio en un hilo separado"""
                 try:
                     # Esperar un poco para que FastAPI termine de inicializar
-                    time.sleep(2)
+                    time.sleep(3)
                     
                     # Lanzar la interfaz Gradio
                     gradio_connector.launch(port=7860, share=False)
@@ -543,8 +547,9 @@ class BehemotFactory:
             gradio_thread = threading.Thread(target=launch_gradio, daemon=True)
             gradio_thread.start()
             
-            # Marcar que Gradio está habilitado para mostrar en logs de startup
+            # Marcar que Gradio está habilitado y configurado
             self._gradio_enabled = True
+            self._gradio_initialized = True
             
             logger.info("✅ Interfaz de prueba local configurada")
             
@@ -710,7 +715,7 @@ class BehemotFactory:
             if hasattr(factory, '_gradio_enabled') and factory._gradio_enabled:
                 logger.info("")
                 logger.info("🌐 Interfaz de prueba local disponible:")
-                logger.info("   http://localhost:7860")
+                logger.info("   http://localhost:7860 (o puerto disponible)")
                 logger.info("")
             
         # Configurar rutas básicas

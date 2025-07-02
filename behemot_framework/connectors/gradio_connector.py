@@ -163,7 +163,8 @@ class GradioConnector:
                     label="Conversación",
                     height=400,
                     show_label=True,
-                    container=True
+                    container=True,
+                    type="messages"
                 )
                 
                 with gr.Row():
@@ -259,11 +260,34 @@ class GradioConnector:
         """
         self.interface = self.create_interface()
         
-        logger.info(f"🚀 Lanzando interfaz de prueba local en puerto {port}")
-        logger.info(f"🌐 Accede a http://localhost:{port}")
+        # Intentar encontrar un puerto disponible
+        import socket
+        
+        def find_free_port(start_port):
+            """Encuentra un puerto disponible empezando desde start_port"""
+            for test_port in range(start_port, start_port + 10):
+                try:
+                    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                        s.bind(('localhost', test_port))
+                        return test_port
+                except OSError:
+                    continue
+            return None
+        
+        # Buscar puerto disponible
+        available_port = find_free_port(port)
+        if available_port is None:
+            logger.error(f"❌ No se pudo encontrar un puerto disponible desde {port}")
+            return
+            
+        if available_port != port:
+            logger.warning(f"⚠️ Puerto {port} ocupado, usando puerto {available_port}")
+        
+        logger.info(f"🚀 Lanzando interfaz de prueba local en puerto {available_port}")
+        logger.info(f"🌐 Accede a http://localhost:{available_port}")
         
         self.interface.launch(
-            server_port=port,
+            server_port=available_port,
             share=share,
             server_name="0.0.0.0",
             quiet=False,
