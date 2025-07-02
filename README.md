@@ -129,9 +129,28 @@ app = create_behemot_app(
     enable_whatsapp=True,     # WhatsApp Business
     enable_google_chat=True,  # Google Chat
     enable_voice=True,        # Procesamiento de voz
+    enable_test_local=True,   # Interfaz de prueba local con Gradio
     config_path="config/mi_asistente.yaml",
 )
 ```
+
+### Interfaz de Prueba Local
+
+Para probar tu asistente de forma visual antes de desplegarlo:
+
+```python
+# En main.py
+app = create_behemot_app(
+    enable_test_local=True,   # Activar interfaz visual
+    config_path="config/mi_asistente.yaml",
+)
+```
+
+Esto creará una interfaz web en http://localhost:7860 con:
+- 💬 **Chat interactivo** - Prueba conversaciones
+- 🎤 **Entrada de voz** - Si `enable_voice=True`
+- 🔧 **Panel de herramientas** - Ve las herramientas disponibles
+- ⚙️ **Configuración** - Revisa la configuración actual
 
 ### Configurar Variables de Entorno
 

@@ -45,6 +45,7 @@ setup(
         'httpx',
         'google-generativeai>=0.3.0',
         'langchain-google-genai>=1.0.0',
+        'gradio>=4.0.0',
     ],
     author='Your Name', # Reemplazar con tu nombre
     author_email='your.email@example.com', # Reemplazar con tu email

@@ -507,6 +507,52 @@ class BehemotFactory:
         except Exception as e:
             logger.error(f"Error al configurar Google Chat: {str(e)}", exc_info=True)
 
+    def setup_test_local_interface(self) -> None:
+        """
+        Configura la interfaz de prueba local usando Gradio.
+        Ejecuta la interfaz en un hilo separado para no bloquear FastAPI.
+        """
+        try:
+            from behemot_framework.connectors.gradio_connector import GradioConnector
+            from behemot_framework.tooling import get_tool_definitions
+            import threading
+            import time
+            
+            logger.info("🚀 Configurando interfaz de prueba local con Gradio...")
+            
+            # Crear el conector Gradio
+            gradio_connector = GradioConnector(
+                assistant=self.asistente,
+                tools_registry=get_tool_definitions(),
+                transcriptor=self.transcriptor
+            )
+            
+            def launch_gradio():
+                """Función para lanzar Gradio en un hilo separado"""
+                try:
+                    # Esperar un poco para que FastAPI termine de inicializar
+                    time.sleep(2)
+                    
+                    # Lanzar la interfaz Gradio
+                    gradio_connector.launch(port=7860, share=False)
+                    
+                except Exception as e:
+                    logger.error(f"Error al lanzar interfaz Gradio: {e}", exc_info=True)
+            
+            # Lanzar Gradio en un hilo separado para no bloquear FastAPI
+            gradio_thread = threading.Thread(target=launch_gradio, daemon=True)
+            gradio_thread.start()
+            
+            # Marcar que Gradio está habilitado para mostrar en logs de startup
+            self._gradio_enabled = True
+            
+            logger.info("✅ Interfaz de prueba local configurada")
+            
+        except ImportError:
+            logger.error("❌ No se pudo importar Gradio. Instala con: pip install gradio")
+        except Exception as e:
+            logger.error(f"❌ Error al configurar interfaz de prueba local: {e}", exc_info=True)
+
     def initialize_app(self, fastapi_app: FastAPI) -> None:
         """
         Inicializa la aplicación con configuraciones comunes.
@@ -660,6 +706,13 @@ class BehemotFactory:
             logger.info("✅ Aplicación iniciada correctamente")
             logger.info("=" * 60)
             
+            # Mostrar link de Gradio si está habilitado
+            if hasattr(factory, '_gradio_enabled') and factory._gradio_enabled:
+                logger.info("")
+                logger.info("🌐 Interfaz de prueba local disponible:")
+                logger.info("   http://localhost:7860")
+                logger.info("")
+            
         # Configurar rutas básicas
         @fastapi_app.get("/")
         async def root():
@@ -681,6 +734,7 @@ def create_behemot_app(
                         enable_whatsapp: bool = False,
                         enable_google_chat: bool = False, 
                         enable_voice: bool = False,  # Valor predeterminado es False
+                        enable_test_local: bool = False,  # Nueva opción para interfaz Gradio
                         use_tools: List[str] = None,
                         config_path: Optional[str] = None
                     ) -> FastAPI:
@@ -690,6 +744,9 @@ def create_behemot_app(
         enable_telegram: Activar conector de Telegram
         enable_api: Activar conector de API REST
         enable_whatsapp: Activar conector de WhatsApp (si está implementado)
+        enable_google_chat: Activar conector de Google Chat
+        enable_voice: Activar procesamiento de voz
+        enable_test_local: Activar interfaz de prueba local con Gradio
         use_tools: Lista de nombres de herramientas a cargar ("all" para todas)
         config_path: Ruta al archivo de configuración personalizado
         
@@ -727,6 +784,9 @@ def create_behemot_app(
 
     if enable_google_chat:
         factory.setup_google_chat_connector(app)
+    
+    if enable_test_local:
+        factory.setup_test_local_interface()
     
     # Inicializar componentes comunes (logging, eventos de inicio, etc.)
     factory.initialize_app(app)
