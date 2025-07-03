@@ -31,7 +31,7 @@ class LangChainSafetyFilter:
         """Configura los ajustes de seguridad según el nivel seleccionado"""
         sensitivity = {
             "low": "Solo bloquear contenido extremadamente explícito o peligroso",
-            "medium": "Bloquear contenido inapropiado, información personal y potencialmente peligroso",
+            "medium": "Bloquear contenido realmente inapropiado, pero permitir conversaciones normales",
             "high": "Aplicar filtros estrictos, bloquear cualquier contenido cuestionable o sensible"
         }
         
@@ -49,17 +49,29 @@ class LangChainSafetyFilter:
         """
         # Prompt diseñado para evaluación de seguridad
         safety_template = """
-        Tu trabajo es evaluar si el siguiente texto contiene contenido inapropiado o inseguro.
+        Tu trabajo es evaluar si el siguiente texto contiene contenido realmente inapropiado o peligroso.
         
         Nivel de sensibilidad: {sensitivity}
+        
+        IMPORTANTE: Las siguientes son conversaciones NORMALES y NO deben ser bloqueadas:
+        - Preguntas sobre nombres, edad, fechas de nacimiento
+        - Preguntas sobre memoria o recordar información 
+        - Conversaciones casuales y amistosas
+        - Intercambio de información personal básica en contexto de conversación
+        
+        SOLO bloquear si contiene:
+        - Contenido sexual explícito
+        - Violencia gráfica
+        - Discurso de odio real
+        - Instrucciones para actividades ilegales
+        - Amenazas reales
         
         Texto a evaluar:
         ---
         {content}
         ---
         
-        ¿Este contenido es apropiado y seguro para todos los públicos?
-        Si NO es seguro, proporciona una versión filtrada que sea apropiada.
+        ¿Este contenido es realmente inapropiado y debe ser bloqueado?
         
         Responde con un JSON que tenga las siguientes claves:
         - is_safe: (true/false)
