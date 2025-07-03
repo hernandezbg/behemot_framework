@@ -179,6 +179,18 @@ async def enhanced_status_command(chat_id: str, **kwargs) -> str:
     Comando mejorado para mostrar el estado detallado del sistema.
     Similar al endpoint /status pero en formato de texto.
     """
+    try:
+        # Verificar permisos
+        from behemot_framework.commandos.permissions import get_permission_manager
+        
+        perm_manager = get_permission_manager()
+        if not perm_manager.has_permission(chat_id, "status"):
+            return "❌ **Acceso denegado**: No tienes permisos para ver el estado del sistema.\n\nUsa `&whoami` para ver tus permisos actuales."
+        
+    except Exception as perm_error:
+        logger.error(f"Error verificando permisos para status: {perm_error}")
+        return f"❌ Error verificando permisos: {str(perm_error)}"
+    
     start_time = time.time()
     
     # Recolectar información de todos los sistemas
@@ -519,6 +531,13 @@ async def sendmsg_command(chat_id: str, message: str = None, platform: str = Non
         str: Resultado del envío masivo
     """
     try:
+        # Verificar permisos
+        from behemot_framework.commandos.permissions import get_permission_manager
+        
+        perm_manager = get_permission_manager()
+        if not perm_manager.has_permission(chat_id, "sendmsg"):
+            return "❌ **Acceso denegado**: No tienes permisos para enviar mensajes masivos.\n\nUsa `&whoami` para ver tus permisos actuales."
+        
         # Obtener comandos de administración
         admin_commands = get_admin_commands()
         
@@ -563,6 +582,13 @@ async def list_users_command(chat_id: str, platform: str = None, days: str = "7"
         str: Lista de usuarios activos
     """
     try:
+        # Verificar permisos
+        from behemot_framework.commandos.permissions import get_permission_manager
+        
+        perm_manager = get_permission_manager()
+        if not perm_manager.has_permission(chat_id, "list_users"):
+            return "❌ **Acceso denegado**: No tienes permisos para listar usuarios.\n\nUsa `&whoami` para ver tus permisos actuales."
+        
         from behemot_framework.users import get_user_tracker
         
         # Convertir días
@@ -658,6 +684,163 @@ async def list_users_command(chat_id: str, platform: str = None, days: str = "7"
     except Exception as e:
         logger.error(f"Error en comando list_users: {str(e)}", exc_info=True)
         return f"❌ Error al listar usuarios: {str(e)}"
+
+@command(name="whoami", description="Muestra información del usuario actual y sus permisos")
+async def whoami_command(chat_id: str, **kwargs) -> str:
+    """
+    Muestra información del usuario actual incluyendo permisos y metadata.
+    
+    Args:
+        chat_id: ID del usuario que ejecuta el comando
+        
+    Returns:
+        str: Información detallada del usuario
+    """
+    try:
+        from behemot_framework.users import get_user_tracker
+        from behemot_framework.commandos.admin_commands import get_admin_commands
+        from datetime import datetime
+        
+        # Obtener información del usuario
+        user_tracker = get_user_tracker()
+        admin_commands = get_admin_commands()
+        
+        # Buscar el usuario en todas las plataformas
+        user_info = None
+        user_platform = None
+        
+        for platform in ["telegram", "whatsapp", "api", "google_chat"]:
+            users = user_tracker.get_users_by_platform(platform, 365)  # Buscar en el último año
+            for user in users:
+                if user["user_id"] == chat_id:
+                    user_info = user
+                    user_platform = platform
+                    break
+            if user_info:
+                break
+        
+        if not user_info:
+            return "❌ No se encontró información de usuario. Esto puede suceder si es tu primera interacción."
+        
+        # Obtener metadata específica de la plataforma
+        metadata = user_info.get("metadata", {})
+        
+        # Formatear información básica
+        result = "👤 **Tu información de usuario:**\n\n"
+        result += f"🆔 **User ID**: `{chat_id}`\n"
+        result += f"📱 **Plataforma**: `{user_platform}`\n"
+        
+        # Formatear fechas
+        try:
+            first_seen = datetime.fromisoformat(user_info["first_seen"])
+            last_seen = datetime.fromisoformat(user_info["last_seen"])
+            result += f"⏰ **Primera vez visto**: `{first_seen.strftime('%Y-%m-%d %H:%M:%S')}`\n"
+            result += f"🕐 **Última actividad**: `{last_seen.strftime('%Y-%m-%d %H:%M:%S')}`\n"
+        except:
+            result += f"⏰ **Primera vez visto**: `{user_info.get('first_seen', 'Desconocido')}`\n"
+            result += f"🕐 **Última actividad**: `{user_info.get('last_seen', 'Desconocido')}`\n"
+        
+        # Información específica por plataforma
+        result += "\n📋 **Información de la plataforma:**\n"
+        
+        if user_platform == "telegram":
+            if metadata.get("username_handle"):
+                result += f"• **Username**: @{metadata['username_handle']}\n"
+            if metadata.get("display_name"):
+                result += f"• **Nombre**: {metadata['display_name']}\n"
+            if metadata.get("language_code"):
+                result += f"• **Idioma**: {metadata['language_code']}\n"
+            if metadata.get("is_premium"):
+                result += f"• **Telegram Premium**: {'Sí' if metadata['is_premium'] else 'No'}\n"
+                
+        elif user_platform == "whatsapp":
+            if metadata.get("phone_number"):
+                result += f"• **📱 Teléfono**: {metadata['phone_number']}\n"
+            if metadata.get("profile_name"):
+                result += f"• **Nombre**: {metadata['profile_name']}\n"
+            if metadata.get("country_code"):
+                result += f"• **País**: {metadata['country_code']}\n"
+                
+        elif user_platform == "google_chat":
+            if metadata.get("email"):
+                result += f"• **📧 Email**: {metadata['email']}\n"
+            if metadata.get("display_name"):
+                result += f"• **Nombre**: {metadata['display_name']}\n"
+            if metadata.get("domain"):
+                result += f"• **Dominio**: {metadata['domain']}\n"
+            if metadata.get("space_type"):
+                result += f"• **Tipo de espacio**: {metadata['space_type']}\n"
+                
+        elif user_platform == "api":
+            if metadata.get("ip_address"):
+                result += f"• **🌐 IP**: {metadata['ip_address']}\n"
+            if metadata.get("user_agent"):
+                user_agent = metadata['user_agent'][:50] + "..." if len(metadata['user_agent']) > 50 else metadata['user_agent']
+                result += f"• **Navegador**: {user_agent}\n"
+            if metadata.get("session_id"):
+                result += f"• **Sesión**: {metadata['session_id']}\n"
+        
+        # Obtener información de permisos real
+        from behemot_framework.commandos.permissions import get_permission_manager
+        
+        perm_manager = get_permission_manager()
+        perm_info = perm_manager.get_permission_info(chat_id, user_platform)
+        
+        result += "\n🔑 **Permisos actuales:**\n"
+        
+        # Mostrar si es admin
+        if perm_info["is_admin"]:
+            result += f"👑 **Administrador** (modo: {perm_info['admin_mode']})\n"
+        else:
+            result += "👤 **Usuario regular**\n"
+        
+        # Mostrar permisos detallados
+        for perm_name, perm_data in perm_info["permission_details"].items():
+            status = "✅" if perm_data["has_permission"] else "❌"
+            result += f"{status} **{perm_name}** - {perm_data['description']}\n"
+        
+        # Comandos disponibles basados en permisos reales
+        available_commands = perm_info["available_commands"]
+        
+        result += "\n📊 **Comandos disponibles:**\n"
+        if available_commands:
+            for cmd in available_commands:
+                result += f"• `&{cmd}` - {_get_command_description(cmd)}\n"
+        else:
+            result += "• `&whoami` - Ver tu información (comando básico)\n"
+        
+        result += "\n💡 **Tip**: Usa `&help` para ver todos los comandos disponibles."
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error en comando whoami: {str(e)}", exc_info=True)
+        return f"❌ Error al obtener información del usuario: {str(e)}"
+
+def _get_command_description(cmd: str) -> str:
+    """
+    Obtiene la descripción de un comando.
+    
+    Args:
+        cmd: Nombre del comando
+        
+    Returns:
+        Descripción del comando
+    """
+    descriptions = {
+        "whoami": "Ver tu información y permisos",
+        "sendmsg": "Envío masivo de mensajes",
+        "list_users": "Ver usuarios activos",
+        "delete_session": "Eliminar sesiones específicas",
+        "list_sessions": "Listar todas las sesiones",
+        "status": "Estado del sistema",
+        "monitor": "Monitorear sistema en tiempo real",
+        "reset_to_fabric": "Reiniciar todo el sistema",
+        "clear_msg": "Limpiar historial de mensajes",
+        "help": "Lista completa de comandos",
+        "analyze_session": "Analizar estadísticas de sesión"
+    }
+    return descriptions.get(cmd, "Comando disponible")
 
 @command(name="analyze_session", description="Analiza una sesión para obtener estadísticas e insights")
 async def analyze_session_command(chat_id: str, session_id: str = None, detailed: str = "false", **kwargs) -> str:

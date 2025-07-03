@@ -1,0 +1,66 @@
+# Ejemplo de configuración con usuarios administradores
+# Este archivo muestra cómo configurar permisos de usuario
+
+# Configuración básica del asistente
+ASSISTANT_NAME: "mi_bot_test"
+VERSION: "1.0.0"
+PROMPT_SISTEMA: "Eres un asistente inteligente llamado mi_bot_test. Ayudas a los usuarios con sus consultas de manera amigable y profesional."
+
+# Configuración del modelo
+MODEL_PROVIDER: "openai"  # openai, gemini
+MODEL_NAME: "gpt-4o-mini"
+MODEL_TEMPERATURE: 0.7
+MAX_TOKENS: 1000
+
+# Configuración de seguridad
+SAFETY_LEVEL: "medium"  # off, low, medium, high
+
+# ===== CONFIGURACIÓN DE PERMISOS =====
+
+# Modo de administración
+ADMIN_MODE: "production"  # dev, production
+# - dev: Todos los usuarios tienen permisos de admin (para desarrollo)
+# - production: Solo usuarios configurados tienen permisos
+
+# Lista de usuarios administradores
+ADMIN_USERS:
+  # Super administrador (todos los permisos)
+  - user_id: "1069636329"              # Tu ID de Telegram
+    platform: "telegram"               # telegram, whatsapp, google_chat, api
+    permissions: ["super_admin"]       # Acceso total
+    
+  # Administrador de contenido (solo broadcast)
+  - user_id: "admin@empresa.com"       # Email de Google Chat
+    platform: "google_chat"
+    permissions: ["broadcast"]         # Solo envío masivo
+    
+  # Administrador de usuarios (gestión + broadcast)
+  - user_id: "+5491234567890"          # Número de WhatsApp
+    platform: "whatsapp"
+    permissions: ["broadcast", "user_management"]
+    
+  # Administrador multiplataforma
+  - user_id: "admin_general"
+    platform: "any"                    # Funciona en cualquier plataforma
+    permissions: ["broadcast", "user_management", "system"]
+
+# ===== PERMISOS DISPONIBLES =====
+# 
+# user_info:        Ver información propia (&whoami)
+# broadcast:        Envío masivo (&sendmsg, &list_users)
+# user_management:  Gestión de usuarios (&delete_session, &list_sessions)
+# system:           Sistema (&status, &monitor, &reset_to_fabric, &clear_msg)
+# super_admin:      Todos los comandos (*)
+
+# ===== CONFIGURACIÓN OPCIONAL =====
+
+# RAG (Recuperación de información)
+ENABLE_RAG: false
+RAG_FOLDERS: ["./docs"]
+
+# Interfaz de prueba local
+ENABLE_TEST_LOCAL: true
+GRADIO_SHARE: false
+
+# Herramientas (agregar según necesites)
+# Se cargarán automáticamente desde el directorio tools/

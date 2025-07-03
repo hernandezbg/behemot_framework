@@ -32,7 +32,20 @@ PROMPT_SISTEMA: |
   Recuerda siempre ser respetuoso y profesional.
 
 # Configuración de seguridad
-SAFETY_LEVEL: "medium"  # low, medium, high
+SAFETY_LEVEL: "medium"  # off, low, medium, high
+
+# Sistema de permisos
+ADMIN_MODE: "dev"  # dev, production
+# En modo "dev": todos los usuarios tienen permisos de admin
+# En modo "production": solo usuarios configurados tienen permisos
+
+# Usuarios administradores (para modo production)
+ADMIN_USERS: []
+# Ejemplo de configuración:
+# ADMIN_USERS:
+#   - user_id: "tu_id_de_usuario"
+#     platform: "telegram"  # telegram, whatsapp, google_chat, api
+#     permissions: ["super_admin"]  # super_admin, broadcast, user_management, system
 
 # Configuración de Redis (opcional)
 REDIS_PUBLIC_URL: ""  # Ejemplo: redis://localhost:6379
@@ -45,6 +58,9 @@ RAG_EMBEDDING_MODEL: "text-embedding-3-small"
 
 # Configuración de logs
 LOG_LEVEL: "INFO"
+
+# Versión del asistente
+VERSION: "1.0.0"
 """
 
 

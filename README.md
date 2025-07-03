@@ -183,6 +183,35 @@ SAFETY_LEVEL: "medium"  # off, low, medium, high
 
 **Nota**: El filtro permite automáticamente conversaciones normales como preguntas sobre nombres, edad, fechas, etc.
 
+### Configurar Sistema de Permisos
+
+El framework incluye un sistema de permisos granular para comandos administrativos:
+
+```yaml
+# En config/mi_asistente.yaml
+ADMIN_MODE: "production"  # dev, production
+
+ADMIN_USERS:
+  - user_id: "1069636329"        # Tu ID de usuario
+    platform: "telegram"        # telegram, whatsapp, google_chat, api
+    permissions: ["super_admin"] # super_admin, broadcast, user_management, system
+```
+
+**Modos disponibles:**
+- `"dev"` - **Desarrollo** - Todos los usuarios tienen permisos de admin
+- `"production"` - **Producción** - Solo usuarios configurados tienen permisos
+
+**Permisos disponibles:**
+- `"user_info"` - Ver información propia (`&whoami`)
+- `"broadcast"` - Envío masivo (`&sendmsg`, `&list_users`)
+- `"user_management"` - Gestión de usuarios (`&delete_session`, `&list_sessions`)
+- `"system"` - Comandos de sistema (`&status`, `&monitor`, `&clear_msg`)
+- `"super_admin"` - **Todos los comandos** (acceso total)
+
+**Comandos útiles:**
+- `&whoami` - Ver tu ID de usuario y permisos actuales
+- `&help` - Lista completa de comandos disponibles
+
 ### Configurar Variables de Entorno
 
 Edita tu archivo `.env`:
@@ -223,6 +252,8 @@ GC_CLIENT_EMAIL=...
 - **🔧 Herramientas Extensibles**: Sistema de plugins simple
 - **🎤 Procesamiento de Voz**: Transcripción automática de audio
 - **🔒 Filtros de Seguridad**: Contenido seguro por defecto (configurable)
+- **👥 Sistema de Permisos**: Control granular de acceso a comandos administrativos
+- **📨 Mensajería Masiva**: Envío de mensajes a todos los usuarios activos
 - **💾 Persistencia de Contexto**: Conversaciones continuas con Redis
 - **📊 Diagnósticos**: Monitoreo automático de componentes
 
