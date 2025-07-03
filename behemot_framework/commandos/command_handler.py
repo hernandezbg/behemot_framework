@@ -184,7 +184,9 @@ async def enhanced_status_command(chat_id: str, **kwargs) -> str:
         from behemot_framework.commandos.permissions import get_permission_manager
         
         perm_manager = get_permission_manager()
-        if not perm_manager.has_permission(chat_id, "status"):
+        user_platform = _get_user_platform(chat_id)
+        
+        if not perm_manager.has_permission(chat_id, "status", user_platform):
             return "❌ **Acceso denegado**: No tienes permisos para ver el estado del sistema.\n\nUsa `&whoami` para ver tus permisos actuales."
         
     except Exception as perm_error:
@@ -535,7 +537,9 @@ async def sendmsg_command(chat_id: str, message: str = None, platform: str = Non
         from behemot_framework.commandos.permissions import get_permission_manager
         
         perm_manager = get_permission_manager()
-        if not perm_manager.has_permission(chat_id, "sendmsg"):
+        user_platform = _get_user_platform(chat_id)
+        
+        if not perm_manager.has_permission(chat_id, "sendmsg", user_platform):
             return "❌ **Acceso denegado**: No tienes permisos para enviar mensajes masivos.\n\nUsa `&whoami` para ver tus permisos actuales."
         
         # Obtener comandos de administración
@@ -586,7 +590,9 @@ async def list_users_command(chat_id: str, platform: str = None, days: str = "7"
         from behemot_framework.commandos.permissions import get_permission_manager
         
         perm_manager = get_permission_manager()
-        if not perm_manager.has_permission(chat_id, "list_users"):
+        user_platform = _get_user_platform(chat_id)
+        
+        if not perm_manager.has_permission(chat_id, "list_users", user_platform):
             return "❌ **Acceso denegado**: No tienes permisos para listar usuarios.\n\nUsa `&whoami` para ver tus permisos actuales."
         
         from behemot_framework.users import get_user_tracker
@@ -816,6 +822,29 @@ async def whoami_command(chat_id: str, **kwargs) -> str:
     except Exception as e:
         logger.error(f"Error en comando whoami: {str(e)}", exc_info=True)
         return f"❌ Error al obtener información del usuario: {str(e)}"
+
+def _get_user_platform(chat_id: str) -> str:
+    """
+    Detecta la plataforma de un usuario basándose en su registro.
+    
+    Args:
+        chat_id: ID del usuario
+        
+    Returns:
+        Plataforma del usuario o "any" si no se encuentra
+    """
+    try:
+        from behemot_framework.users import get_user_tracker
+        user_tracker = get_user_tracker()
+        
+        for platform in ["telegram", "whatsapp", "api", "google_chat"]:
+            users = user_tracker.get_users_by_platform(platform, 365)
+            for user in users:
+                if user["user_id"] == chat_id:
+                    return platform
+        return "any"
+    except Exception:
+        return "any"
 
 def _get_command_description(cmd: str) -> str:
     """
