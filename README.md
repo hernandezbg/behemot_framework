@@ -166,6 +166,23 @@ export GRADIO_SHARE=true
 python main.py
 ```
 
+### Configurar Filtro de Seguridad
+
+El framework incluye un filtro de seguridad configurable para proteger contra contenido inapropiado:
+
+```yaml
+# En config/mi_asistente.yaml
+SAFETY_LEVEL: "medium"  # off, low, medium, high
+```
+
+**Niveles disponibles:**
+- `"off"` - **Filtro deshabilitado** - Permite todo el contenido
+- `"low"` - **Muy permisivo** - Solo bloquea contenido extremadamente peligroso
+- `"medium"` - **Equilibrado** *(recomendado)* - Bloquea contenido inapropiado, permite conversación normal
+- `"high"` - **Estricto** - Filtrado más riguroso para entornos sensibles
+
+**Nota**: El filtro permite automáticamente conversaciones normales como preguntas sobre nombres, edad, fechas, etc.
+
 ### Configurar Variables de Entorno
 
 Edita tu archivo `.env`:
@@ -205,7 +222,7 @@ GC_CLIENT_EMAIL=...
 - **🧠 RAG Integrado**: Lee carpetas locales, GCP, S3, Google Drive automáticamente
 - **🔧 Herramientas Extensibles**: Sistema de plugins simple
 - **🎤 Procesamiento de Voz**: Transcripción automática de audio
-- **🔒 Filtros de Seguridad**: Contenido seguro por defecto
+- **🔒 Filtros de Seguridad**: Contenido seguro por defecto (configurable)
 - **💾 Persistencia de Contexto**: Conversaciones continuas con Redis
 - **📊 Diagnósticos**: Monitoreo automático de componentes
 

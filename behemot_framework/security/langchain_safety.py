@@ -17,25 +17,33 @@ class LangChainSafetyFilter:
     def __init__(self, api_key, safety_level="medium"):
         self.api_key = api_key
         self.safety_level = safety_level
-        self.llm = ChatOpenAI(
-            api_key=api_key, 
-            model="gpt-3.5-turbo",
-            temperature=0,
-            max_tokens=150
-        )
         
-        # Configura la sensibilidad según el nivel de seguridad
-        self.setup_safety_settings()
+        # Si está deshabilitado, no inicializar LLM
+        if safety_level.lower() == "off":
+            self.llm = None
+            self.sensitivity = None
+            logger.info("🔓 Filtro de seguridad DESHABILITADO (SAFETY_LEVEL: off)")
+        else:
+            self.llm = ChatOpenAI(
+                api_key=api_key, 
+                model="gpt-3.5-turbo",
+                temperature=0,
+                max_tokens=150
+            )
+            
+            # Configura la sensibilidad según el nivel de seguridad
+            self.setup_safety_settings()
+            logger.info(f"🛡️ Filtro de seguridad ACTIVADO (nivel: {safety_level})")
     
     def setup_safety_settings(self):
         """Configura los ajustes de seguridad según el nivel seleccionado"""
         sensitivity = {
-            "low": "Solo bloquear contenido extremadamente explícito o peligroso",
-            "medium": "Bloquear contenido realmente inapropiado, pero permitir conversaciones normales",
-            "high": "Aplicar filtros estrictos, bloquear cualquier contenido cuestionable o sensible"
+            "low": "Muy permisivo - Solo bloquear contenido extremadamente peligroso como violencia gráfica o pornografía explícita",
+            "medium": "Equilibrado - Bloquear contenido inapropiado real, pero permitir conversaciones normales sobre nombres, edad, etc.",
+            "high": "Estricto - Bloquear contenido cuestionable, pero siempre permitir preguntas educativas y conversación casual"
         }
         
-        self.sensitivity = sensitivity.get(self.safety_level, sensitivity["medium"])
+        self.sensitivity = sensitivity.get(self.safety_level.lower(), sensitivity["medium"])
     
     async def filter_content(self, content):
         """
@@ -49,26 +57,29 @@ class LangChainSafetyFilter:
         """
         # Prompt diseñado para evaluación de seguridad
         safety_template = """
-        Evalúa si el siguiente texto es REALMENTE peligroso o inapropiado.
-        
-        Conversaciones NORMALES que SIEMPRE deben permitirse:
-        - Preguntas sobre nombres o cómo te llamas
-        - Preguntas sobre edad o fechas
-        - Preguntas sobre memoria o recordar
-        - Conversación casual y amistosa
-        - Información personal básica
-        
-        SOLO marcar como inseguro si contiene:
-        - Contenido sexual explícito
-        - Violencia gráfica
-        - Amenazas directas
-        - Instrucciones ilegales
-        
-        Texto: {content}
-        
-        Responde SOLO con:
-        SAFE si es conversación normal
-        UNSAFE: razón si es realmente peligroso
+Eres un filtro de seguridad para un chatbot. Tu trabajo es identificar contenido REALMENTE peligroso.
+
+NIVEL DE SENSIBILIDAD: {sensitivity}
+
+IMPORTANTE - Estas son conversaciones NORMALES que SIEMPRE debes permitir:
+• Preguntas sobre nombres, edad, fechas de nacimiento
+• Preguntas sobre memoria o información pasada  
+• Conversaciones casuales y amistosas
+• Intercambio de información personal básica
+• Preguntas generales y educativas
+
+SOLO marcar como UNSAFE si contiene:
+• Contenido sexual explícito o pornográfico
+• Violencia gráfica o amenazas reales
+• Discurso de odio extremo
+• Instrucciones para actividades ilegales
+• Intención clara de causar daño
+
+Texto a evaluar: "{content}"
+
+Responde EXACTAMENTE con una de estas opciones:
+SAFE
+UNSAFE: [razón específica]
         """
         
         safety_prompt = PromptTemplate.from_template(safety_template)
@@ -76,19 +87,56 @@ class LangChainSafetyFilter:
         # Crear la cadena para evaluación de seguridad
         safety_chain = safety_prompt | self.llm | StrOutputParser()
         
-        # Temporalmente deshabilitado para evitar problemas de parseo
-        # El filtro puede ser muy estricto y causar problemas de conversación
-        logger.info(f"Filtro de seguridad omitido para: '{content[:50]}...'")
-        return {
-            "is_safe": True,
-            "filtered_content": content,
-            "reason": None
-        }
+        # Si el filtro está deshabilitado, permitir todo
+        if self.safety_level.lower() == "off" or self.llm is None:
+            logger.debug(f"Filtro de seguridad omitido (deshabilitado) para: '{content[:50]}...'")
+            return {
+                "is_safe": True,
+                "filtered_content": content,
+                "reason": None
+            }
         
-        # Código original comentado hasta resolver problemas de parseo
-        # try:
-        #     logger.info(f"Evaluando seguridad para texto: '{content[:50]}...'")
-        #     result = await safety_chain.ainvoke({
-        #         "content": content
-        #     })
-        #     # ... resto del código ...
+        try:
+            logger.info(f"🔍 Evaluando seguridad (nivel {self.safety_level}) para: '{content[:50]}...'")
+            result = await safety_chain.ainvoke({
+                "content": content,
+                "sensitivity": self.sensitivity
+            })
+            
+            # Parsear respuesta simplificada
+            result = result.strip()
+            
+            if result.upper().startswith("SAFE"):
+                logger.info(f"✅ Contenido aprobado por filtro de seguridad")
+                return {
+                    "is_safe": True,
+                    "filtered_content": content,
+                    "reason": None
+                }
+            elif result.upper().startswith("UNSAFE"):
+                reason = result.replace("UNSAFE:", "").strip()
+                if not reason:
+                    reason = "Contenido considerado inapropiado"
+                logger.warning(f"🚫 Contenido bloqueado por filtro de seguridad. Razón: {reason}")
+                return {
+                    "is_safe": False,
+                    "filtered_content": "Lo siento, no puedo procesar este mensaje. Por favor, intenta con otro.",
+                    "reason": reason
+                }
+            else:
+                # Si no reconoce el formato, permitir el contenido (fail-safe)
+                logger.warning(f"⚠️ Formato no reconocido del filtro, permitiendo contenido: {result}")
+                return {
+                    "is_safe": True,
+                    "filtered_content": content,
+                    "reason": None
+                }
+                
+        except Exception as e:
+            logger.error(f"❌ Error en filtro de seguridad: {str(e)}")
+            # En caso de error, permitimos el contenido (fail-safe)
+            return {
+                "is_safe": True,
+                "filtered_content": content,
+                "reason": None
+            }
