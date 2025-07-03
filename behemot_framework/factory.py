@@ -142,6 +142,37 @@ class BehemotFactory:
             if mensaje is None:
                 return {"status": "ok"}
             
+            # Registrar usuario en el tracker
+            try:
+                from behemot_framework.users import get_user_tracker
+                user_tracker = get_user_tracker()
+                
+                # Extraer metadata completa del usuario desde el update
+                user_metadata = {}
+                if "message" in update and "from" in update["message"]:
+                    from_user = update["message"]["from"]
+                    chat_info = update["message"]["chat"]
+                    
+                    user_metadata = {
+                        "telegram_user_id": from_user.get("id"),
+                        "username": from_user.get("username"),
+                        "first_name": from_user.get("first_name"),
+                        "last_name": from_user.get("last_name"),
+                        "language_code": from_user.get("language_code"),
+                        "is_bot": from_user.get("is_bot", False),
+                        "is_premium": from_user.get("is_premium", False),
+                        "chat_type": chat_info.get("type"),  # private, group, supergroup, channel
+                        "chat_title": chat_info.get("title") if chat_info.get("type") != "private" else None,
+                        "phone_number": None,  # Telegram no expone esto normalmente
+                        "display_name": f"{from_user.get('first_name', '')} {from_user.get('last_name', '')}".strip(),
+                        "username_handle": f"@{from_user.get('username')}" if from_user.get('username') else None
+                    }
+                
+                user_tracker.register_user(str(chat_id), "telegram", user_metadata)
+                user_tracker.update_last_seen(str(chat_id))
+            except Exception as e:
+                logger.warning(f"Error registrando usuario Telegram {chat_id}: {e}")
+            
             # Indicar que el bot está "escribiendo"
             self.telegram_connector.enviar_accion(chat_id, "typing")
             
@@ -240,6 +271,29 @@ class BehemotFactory:
                     
                     if not session_id or not texto:
                         return {"error": "Formato de mensaje inválido", "status": "error"}
+                
+                # Registrar usuario en el tracker
+                try:
+                    from behemot_framework.users import get_user_tracker
+                    user_tracker = get_user_tracker()
+                    
+                    # Extraer metadata básica para API REST
+                    user_metadata = {
+                        "session_id": session_id,
+                        "user_agent": request.headers.get("User-Agent"),
+                        "ip_address": request.client.host if hasattr(request, 'client') and request.client else None,
+                        "platform_info": "api_rest",
+                        "phone_number": None,
+                        "display_name": session_id,
+                        "chat_type": "api",
+                        "referer": request.headers.get("Referer"),
+                        "content_type": request.headers.get("Content-Type")
+                    }
+                    
+                    user_tracker.register_user(str(session_id), "api", user_metadata)
+                    user_tracker.update_last_seen(str(session_id))
+                except Exception as e:
+                    logger.warning(f"Error registrando usuario API {session_id}: {e}")
                 
                 # Indicador para el log (no visible al usuario)
                 logger.info(f"Mensaje recibido de session: {session_id}")
@@ -376,6 +430,39 @@ class BehemotFactory:
                     logger.debug("No se pudo extraer número de teléfono o mensaje")
                     return {"status": "ok"}
                 
+                # Registrar usuario en el tracker
+                try:
+                    from behemot_framework.users import get_user_tracker
+                    user_tracker = get_user_tracker()
+                    
+                    # Extraer metadata completa del usuario WhatsApp
+                    user_metadata = {
+                        "phone_number": phone_number,
+                        "wa_id": phone_number.replace('+', '').replace('-', ''),
+                        "profile_name": None,
+                        "display_name": phone_number,
+                        "phone_formatted": phone_number,
+                        "country_code": phone_number[:3] if phone_number.startswith('+') else None,
+                        "is_business": False,
+                        "chat_type": "private"
+                    }
+                    
+                    # Intentar extraer información adicional del contacto
+                    if "contacts" in value and value["contacts"]:
+                        contact = value["contacts"][0]
+                        profile = contact.get("profile", {})
+                        
+                        user_metadata.update({
+                            "wa_id": contact.get("wa_id", user_metadata["wa_id"]),
+                            "profile_name": profile.get("name"),
+                            "display_name": profile.get("name") or phone_number
+                        })
+                    
+                    user_tracker.register_user(str(phone_number), "whatsapp", user_metadata)
+                    user_tracker.update_last_seen(str(phone_number))
+                except Exception as e:
+                    logger.warning(f"Error registrando usuario WhatsApp {phone_number}: {e}")
+                
                 logger.info(f"Mensaje recibido de {phone_number}: tipo={mensaje['type']}")
                 
                 if mensaje["type"] == "text":
@@ -474,6 +561,45 @@ class BehemotFactory:
                     
                     if mensaje is None or chat_id is None:
                         return {"text": "No se pudo procesar el mensaje"}
+                    
+                    # Registrar usuario en el tracker
+                    try:
+                        from behemot_framework.users import get_user_tracker
+                        user_tracker = get_user_tracker()
+                        
+                        # Extraer metadata del usuario Google Chat
+                        user_metadata = {
+                            "space_name": chat_id,
+                            "space_type": None,
+                            "user_name": None,
+                            "display_name": None,
+                            "email": None,
+                            "domain": None,
+                            "chat_type": "space",
+                            "phone_number": None
+                        }
+                        
+                        # Intentar extraer información del usuario y espacio
+                        if "message" in update and "sender" in update["message"]:
+                            sender = update["message"]["sender"]
+                            user_metadata.update({
+                                "user_name": sender.get("name"),
+                                "display_name": sender.get("displayName"),
+                                "email": sender.get("email"),
+                                "domain": sender.get("domainId")
+                            })
+                        
+                        if "space" in update:
+                            space = update["space"]
+                            user_metadata.update({
+                                "space_type": space.get("type"),  # ROOM, DM
+                                "space_display_name": space.get("displayName")
+                            })
+                        
+                        user_tracker.register_user(str(chat_id), "google_chat", user_metadata)
+                        user_tracker.update_last_seen(str(chat_id))
+                    except Exception as e:
+                        logger.warning(f"Error registrando usuario Google Chat {chat_id}: {e}")
                     
                     # Manejar diferentes tipos de mensaje
                     if mensaje["type"] == "text":
@@ -597,6 +723,18 @@ class BehemotFactory:
             logger.info("Comandos especiales registrados")
         except ImportError:
             logger.warning("No se pudieron cargar los comandos especiales")
+        
+        # Inicializar user tracker con Redis si está disponible
+        try:
+            from behemot_framework.users import get_user_tracker
+            from behemot_framework.context import redis_client
+            from behemot_framework.commandos.admin_commands import get_admin_commands
+            
+            user_tracker = get_user_tracker(redis_client)
+            admin_commands = get_admin_commands(factory)
+            logger.info("✅ Sistema de usuarios y comandos admin inicializado")
+        except Exception as e:
+            logger.warning(f"⚠️ Error inicializando sistema de usuarios: {e}")
 
         # Configurar rutas de status (nuevo)
         try:

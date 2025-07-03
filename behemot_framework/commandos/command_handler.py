@@ -502,6 +502,163 @@ async def monitor_command(chat_id: str, duration: str = "5", interval: str = "10
 
 from behemot_framework.commandos.session_analyzer import analyze_session, analyze_current_session, format_session_analysis
 
+# Importar comandos de administración
+from behemot_framework.commandos.admin_commands import get_admin_commands
+
+@command(name="sendmsg", description="Envía un mensaje a todos los usuarios activos del bot")
+async def sendmsg_command(chat_id: str, message: str = None, platform: str = None, **kwargs) -> str:
+    """
+    Envía un mensaje masivo a todos los usuarios activos.
+    
+    Args:
+        chat_id: ID del usuario administrador que ejecuta el comando
+        message: Mensaje a enviar (puede incluir comillas)
+        platform: Plataforma específica (opcional: telegram, whatsapp, api, google_chat)
+        
+    Returns:
+        str: Resultado del envío masivo
+    """
+    try:
+        # Obtener comandos de administración
+        admin_commands = get_admin_commands()
+        
+        # Verificar que se proporcione un mensaje
+        if not message:
+            return ("❌ Error: Debes proporcionar un mensaje.\n\n"
+                   "Uso: &sendmsg message=\"Tu mensaje aquí\"\n"
+                   "O: &sendmsg message=\"Tu mensaje\" platform=\"telegram\"\n\n"
+                   "Plataformas disponibles: telegram, whatsapp, api, google_chat")
+        
+        # Validar plataforma si se especifica
+        valid_platforms = ["telegram", "whatsapp", "api", "google_chat"]
+        if platform and platform not in valid_platforms:
+            return f"❌ Plataforma inválida: {platform}\n\nPlataformas válidas: {', '.join(valid_platforms)}"
+        
+        # Ejecutar el comando de envío masivo
+        logger.info(f"Ejecutando sendmsg desde {chat_id}, mensaje: {message[:50]}..., plataforma: {platform}")
+        
+        result = await admin_commands.execute_sendmsg(
+            admin_user_id=chat_id,
+            broadcast_message=message,
+            target_platform=platform
+        )
+        
+        return result["message"]
+        
+    except Exception as e:
+        logger.error(f"Error en comando sendmsg: {str(e)}", exc_info=True)
+        return f"❌ Error al enviar mensaje masivo: {str(e)}"
+
+@command(name="list_users", description="Lista usuarios activos por plataforma")
+async def list_users_command(chat_id: str, platform: str = None, days: str = "7", **kwargs) -> str:
+    """
+    Lista usuarios activos por plataforma.
+    
+    Args:
+        chat_id: ID del usuario que ejecuta el comando
+        platform: Plataforma específica (opcional)
+        days: Días de actividad a considerar (default: 7)
+        
+    Returns:
+        str: Lista de usuarios activos
+    """
+    try:
+        from behemot_framework.users import get_user_tracker
+        
+        # Convertir días
+        try:
+            active_days = int(days)
+            active_days = max(1, min(active_days, 365))  # Entre 1 y 365 días
+        except ValueError:
+            active_days = 7
+        
+        user_tracker = get_user_tracker()
+        
+        if platform:
+            # Lista de una plataforma específica
+            users = user_tracker.get_users_by_platform(platform, active_days)
+            
+            if not users:
+                return f"📭 No hay usuarios activos en {platform} en los últimos {active_days} días."
+            
+            result = f"👥 **Usuarios activos en {platform.title()}** (últimos {active_days} días):\n\n"
+            
+            for i, user in enumerate(users, 1):
+                user_id = user["user_id"]
+                last_seen = user["last_seen"][:10]  # Solo fecha
+                metadata = user.get("metadata", {})
+                
+                result += f"{i}. ID: `{user_id}`\n"
+                result += f"   Última actividad: {last_seen}\n"
+                
+                # Información específica por plataforma
+                if platform == "telegram":
+                    if metadata.get("username_handle"):
+                        result += f"   Username: {metadata['username_handle']}\n"
+                    if metadata.get("display_name"):
+                        result += f"   Nombre: {metadata['display_name']}\n"
+                    if metadata.get("language_code"):
+                        result += f"   Idioma: {metadata['language_code']}\n"
+                        
+                elif platform == "whatsapp":
+                    if metadata.get("phone_number"):
+                        result += f"   📱 Teléfono: {metadata['phone_number']}\n"
+                    if metadata.get("profile_name"):
+                        result += f"   Nombre: {metadata['profile_name']}\n"
+                    if metadata.get("country_code"):
+                        result += f"   País: {metadata['country_code']}\n"
+                        
+                elif platform == "google_chat":
+                    if metadata.get("email"):
+                        result += f"   📧 Email: {metadata['email']}\n"
+                    if metadata.get("display_name"):
+                        result += f"   Nombre: {metadata['display_name']}\n"
+                    if metadata.get("domain"):
+                        result += f"   Dominio: {metadata['domain']}\n"
+                        
+                elif platform == "api":
+                    if metadata.get("ip_address"):
+                        result += f"   🌐 IP: {metadata['ip_address']}\n"
+                    if metadata.get("user_agent"):
+                        user_agent = metadata['user_agent'][:50] + "..." if len(metadata['user_agent']) > 50 else metadata['user_agent']
+                        result += f"   Navegador: {user_agent}\n"
+                
+                result += "\n"
+                
+        else:
+            # Lista de todas las plataformas
+            all_users = user_tracker.get_all_active_users(active_days)
+            
+            if not all_users:
+                return f"📭 No hay usuarios activos en ninguna plataforma en los últimos {active_days} días."
+            
+            result = f"👥 **Usuarios activos por plataforma** (últimos {active_days} días):\n\n"
+            
+            total_users = 0
+            for platform, users in all_users.items():
+                result += f"**{platform.title()}**: {len(users)} usuarios\n"
+                total_users += len(users)
+                
+                # Mostrar algunos ejemplos
+                for i, user in enumerate(users[:3]):
+                    user_id = user["user_id"]
+                    last_seen = user["last_seen"][:10]
+                    result += f"  • {user_id} (última: {last_seen})\n"
+                
+                if len(users) > 3:
+                    result += f"  • ... y {len(users) - 3} más\n"
+                
+                result += "\n"
+            
+            result += f"**Total**: {total_users} usuarios activos\n\n"
+            result += "💡 Usa `&list_users platform=\"telegram\"` para ver detalles de una plataforma específica."
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error en comando list_users: {str(e)}", exc_info=True)
+        return f"❌ Error al listar usuarios: {str(e)}"
+
 @command(name="analyze_session", description="Analiza una sesión para obtener estadísticas e insights")
 async def analyze_session_command(chat_id: str, session_id: str = None, detailed: str = "false", **kwargs) -> str:
     """
