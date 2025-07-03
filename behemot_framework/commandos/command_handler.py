@@ -128,6 +128,15 @@ async def clear_messages(chat_id: str, **kwargs) -> str:
         str: Mensaje de confirmación
     """
     try:
+        # Verificar permisos
+        from behemot_framework.commandos.permissions import get_permission_manager
+        
+        perm_manager = get_permission_manager()
+        user_platform = _get_user_platform(chat_id)
+        
+        if not perm_manager.has_permission(chat_id, "clear_msg", user_platform):
+            return "❌ **Acceso denegado**: No tienes permisos para limpiar mensajes.\n\nUsa `&whoami` para ver tus permisos actuales."
+        
         from behemot_framework.context import redis_client, save_conversation
         from behemot_framework.config import Config
         
@@ -156,12 +165,13 @@ async def clear_messages(chat_id: str, **kwargs) -> str:
 async def help_command(chat_id: str, **kwargs) -> str:
     """
     Muestra la lista de comandos disponibles y su descripción.
+    Nota: Este comando está disponible para todos los usuarios sin verificación de permisos.
     """
     commands = []
     for name, info in COMMAND_REGISTRY.items():
         commands.append(f"&{name}: {info['description']}")
     
-    return "Comandos disponibles:\n\n" + "\n".join(commands)
+    return "📚 **Comandos disponibles:**\n\n" + "\n".join(commands) + "\n\n💡 Usa `&whoami` para ver qué comandos puedes ejecutar según tus permisos."
 
 # Importar funciones del módulo system_status
 from behemot_framework.commandos.system_status import (
@@ -295,6 +305,15 @@ async def reset_to_fabric_command(chat_id: str, **kwargs) -> str:
     Este comando es más drástico que clear_msg ya que elimina TODAS las sesiones.
     """
     try:
+        # Verificar permisos
+        from behemot_framework.commandos.permissions import get_permission_manager
+        
+        perm_manager = get_permission_manager()
+        user_platform = _get_user_platform(chat_id)
+        
+        if not perm_manager.has_permission(chat_id, "reset_to_fabric", user_platform):
+            return "❌ **Acceso denegado**: No tienes permisos para reiniciar el sistema.\n\nUsa `&whoami` para ver tus permisos actuales."
+        
         # 1. Obtener la configuración y el prompt del sistema
         from behemot_framework.config import Config
         from behemot_framework.context import redis_client, save_conversation
@@ -342,6 +361,15 @@ async def delete_session_command(chat_id: str, target_id: str = None, **kwargs) 
         target_id: ID de la sesión a eliminar (si es None, se usa chat_id)
     """
     try:
+        # Verificar permisos
+        from behemot_framework.commandos.permissions import get_permission_manager
+        
+        perm_manager = get_permission_manager()
+        user_platform = _get_user_platform(chat_id)
+        
+        if not perm_manager.has_permission(chat_id, "delete_session", user_platform):
+            return "❌ **Acceso denegado**: No tienes permisos para eliminar sesiones.\n\nUsa `&whoami` para ver tus permisos actuales."
+        
         from behemot_framework.context import redis_client
         
         # Si no se proporciona target_id, usar el chat_id actual
@@ -375,6 +403,15 @@ async def list_sessions_command(chat_id: str, **kwargs) -> str:
     Lista todas las sesiones almacenadas en Redis.
     """
     try:
+        # Verificar permisos
+        from behemot_framework.commandos.permissions import get_permission_manager
+        
+        perm_manager = get_permission_manager()
+        user_platform = _get_user_platform(chat_id)
+        
+        if not perm_manager.has_permission(chat_id, "list_sessions", user_platform):
+            return "❌ **Acceso denegado**: No tienes permisos para listar sesiones.\n\nUsa `&whoami` para ver tus permisos actuales."
+        
         from behemot_framework.context import redis_client
         
         # Verificar que Redis esté disponible
@@ -464,6 +501,15 @@ async def monitor_command(chat_id: str, duration: str = "5", interval: str = "10
         str: Resultados del monitoreo
     """
     try:
+        # Verificar permisos
+        from behemot_framework.commandos.permissions import get_permission_manager
+        
+        perm_manager = get_permission_manager()
+        user_platform = _get_user_platform(chat_id)
+        
+        if not perm_manager.has_permission(chat_id, "monitor", user_platform):
+            return "❌ **Acceso denegado**: No tienes permisos para monitorear el sistema.\n\nUsa `&whoami` para ver tus permisos actuales."
+        
         # Convertir parámetros a tipos correctos
         try:
             duration_min = int(duration)
@@ -866,7 +912,7 @@ def _get_command_description(cmd: str) -> str:
         "monitor": "Monitorear sistema en tiempo real",
         "reset_to_fabric": "Reiniciar todo el sistema",
         "clear_msg": "Limpiar historial de mensajes",
-        "help": "Lista completa de comandos",
+        "help": "Lista completa de comandos (sin permisos requeridos)",
         "analyze_session": "Analizar estadísticas de sesión"
     }
     return descriptions.get(cmd, "Comando disponible")
@@ -885,6 +931,15 @@ async def analyze_session_command(chat_id: str, session_id: str = None, detailed
         str: Resultados del análisis formateados
     """
     try:
+        # Verificar permisos
+        from behemot_framework.commandos.permissions import get_permission_manager
+        
+        perm_manager = get_permission_manager()
+        user_platform = _get_user_platform(chat_id)
+        
+        if not perm_manager.has_permission(chat_id, "analyze_session", user_platform):
+            return "❌ **Acceso denegado**: No tienes permisos para analizar sesiones.\n\nUsa `&whoami` para ver tus permisos actuales."
+        
         # Convertir parámetros
         detailed_bool = detailed.lower() in ("true", "1", "yes", "y")
         target_id = session_id if session_id else chat_id

@@ -14,7 +14,7 @@ class PermissionManager:
     PERMISSION_GROUPS = {
         "user_info": ["whoami"],
         "broadcast": ["sendmsg", "list_users"],
-        "user_management": ["delete_session", "list_sessions"],
+        "user_management": ["delete_session", "list_sessions", "analyze_session"],
         "system": ["status", "monitor", "reset_to_fabric", "clear_msg"],
         "super_admin": ["*"]  # Acceso a todos los comandos
     }
