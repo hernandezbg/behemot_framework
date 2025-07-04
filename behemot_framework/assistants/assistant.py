@@ -172,7 +172,25 @@ class Assistant:
                         
                         context_parts.append(f"Documento {i}{page_info}:\n{content}")
                     
-                    context_message = f"Información relevante de documentos:\n\n" + "\n\n---\n\n".join(context_parts)
+                    # Mejorar formato si múltiples chunks son del mismo archivo
+                    if len(best_documents) > 1:
+                        # Verificar si todos son del mismo archivo
+                        filenames = set()
+                        for doc in best_documents:
+                            if hasattr(doc, 'metadata') and doc.metadata:
+                                filename = doc.metadata.get('filename', '')
+                                if filename:
+                                    filenames.add(filename)
+                        
+                        if len(filenames) == 1:
+                            # Todos del mismo archivo - usar formato simplificado
+                            single_filename = list(filenames)[0]
+                            context_message = f"Información relevante de {single_filename}:\n\n" + "\n\n---\n\n".join(context_parts)
+                        else:
+                            # Múltiples archivos - usar formato detallado
+                            context_message = f"Información relevante de documentos:\n\n" + "\n\n---\n\n".join(context_parts)
+                    else:
+                        context_message = f"Información relevante de documentos:\n\n" + "\n\n---\n\n".join(context_parts)
                     conversation.append({"role": "system", "content": context_message})
                     
                     logger.info(f"📚 AUTO_RAG: {len(best_documents)} documentos relevantes de {successful_searches} carpetas")
