@@ -32,6 +32,13 @@ class Assistant:
             # Para otros proveedores, no usar el filtro de OpenAI
             logger.info(f"Filtro de seguridad desactivado para proveedor: {model_provider}")
             self.safety_filter = None
+        
+        # Configuración AUTO_RAG
+        self.auto_rag_enabled = Config.get("AUTO_RAG", False) and Config.get("ENABLE_RAG", False)
+        if self.auto_rag_enabled:
+            logger.info("🤖 AUTO_RAG activado - El asistente enriquecerá automáticamente las respuestas con documentos")
+            self.rag_max_results = Config.get("RAG_MAX_RESULTS", 3)
+            self.rag_similarity_threshold = Config.get("RAG_SIMILARITY_THRESHOLD", 0.6)
 
     async def generar_respuesta(self, chat_id: str, mensaje_usuario: str) -> str:
 
@@ -58,6 +65,34 @@ class Assistant:
         conversation = DateMiddleware.inject_current_date(conversation)
 
         conversation.append({"role": "user", "content": mensaje_usuario})
+        
+        # AUTO_RAG: Enriquecer automáticamente con contexto de documentos
+        if self.auto_rag_enabled:
+            logger.info(f"🔍 AUTO_RAG: Buscando documentos relevantes para: '{mensaje_usuario[:50]}...'")
+            try:
+                from behemot_framework.rag.rag_manager import RAGManager
+                
+                # Realizar búsqueda automática
+                rag_result = await RAGManager.query_documents(
+                    query=mensaje_usuario,
+                    folder="",  # Buscar en todos los documentos
+                    k=self.rag_max_results
+                )
+                
+                if rag_result["success"] and rag_result["documents"]:
+                    logger.info(f"📚 AUTO_RAG: Encontrados {len(rag_result['documents'])} documentos relevantes")
+                    
+                    # Agregar contexto al historial
+                    context_message = f"Información relevante de documentos:\n\n{rag_result['formatted_context']}"
+                    conversation.append({"role": "system", "content": context_message})
+                    
+                    logger.info(f"✅ AUTO_RAG: Contexto agregado al historial de conversación")
+                else:
+                    logger.info("ℹ️ AUTO_RAG: No se encontraron documentos relevantes")
+                    
+            except Exception as e:
+                logger.error(f"❌ AUTO_RAG Error: {e}")
+                # Continuar sin RAG si hay error
         
         # Obtén las definiciones de las funciones registradas
         functions = get_tool_definitions()

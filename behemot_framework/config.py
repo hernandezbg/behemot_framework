@@ -148,6 +148,7 @@ class Config:
             
             # Configuración de RAG (Retrieval Augmented Generation)
             "ENABLE_RAG": os.getenv("ENABLE_RAG", "false").lower() in ("true", "1", "yes"),
+            "AUTO_RAG": os.getenv("AUTO_RAG", "false").lower() in ("true", "1", "yes"),  # Nuevo: RAG automático
             "RAG_FOLDERS": os.getenv("RAG_FOLDERS", "").split(",") if os.getenv("RAG_FOLDERS") else [],
             "GCP_BUCKET_NAME": os.getenv("GCP_BUCKET_NAME", ""),
             
@@ -158,6 +159,10 @@ class Config:
             "RAG_COLLECTION_NAME": os.getenv("RAG_COLLECTION_NAME", "default_collection"),
             "RAG_CHUNK_SIZE": int(os.getenv("RAG_CHUNK_SIZE", "1000")),
             "RAG_CHUNK_OVERLAP": int(os.getenv("RAG_CHUNK_OVERLAP", "200")),
+            
+            # Configuración AUTO_RAG
+            "RAG_MAX_RESULTS": int(os.getenv("RAG_MAX_RESULTS", "3")),
+            "RAG_SIMILARITY_THRESHOLD": float(os.getenv("RAG_SIMILARITY_THRESHOLD", "0.6")),
             
             # Prompt del sistema por defecto
             "PROMPT_SISTEMA": os.getenv("PROMPT_SISTEMA", """

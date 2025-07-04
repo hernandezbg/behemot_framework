@@ -801,10 +801,19 @@ class BehemotFactory:
                 logger.info("🔍 RAG habilitado - Inicializando...")
                 rag_provider = factory.config.get("RAG_EMBEDDING_PROVIDER", "openai")
                 rag_model = factory.config.get("RAG_EMBEDDING_MODEL", "default")
+                auto_rag_enabled = factory.config.get("AUTO_RAG", False)
                 print(f"  → Proveedor de embeddings: {rag_provider}")
                 print(f"  → Modelo de embeddings: {rag_model}")
+                print(f"  → AUTO_RAG: {'✅ Habilitado' if auto_rag_enabled else '❌ Deshabilitado'}")
                 logger.info(f"  → Proveedor de embeddings: {rag_provider}")
                 logger.info(f"  → Modelo de embeddings: {rag_model}")
+                logger.info(f"  → AUTO_RAG: {'Habilitado' if auto_rag_enabled else 'Deshabilitado'}")
+                
+                if auto_rag_enabled:
+                    max_results = factory.config.get("RAG_MAX_RESULTS", 3)
+                    threshold = factory.config.get("RAG_SIMILARITY_THRESHOLD", 0.6)
+                    print(f"  → Máx. resultados: {max_results}, Umbral: {threshold}")
+                    logger.info(f"  → AUTO_RAG configurado: max_results={max_results}, threshold={threshold}")
                 
                 if factory.config.get("RAG_FOLDERS"):
                     folders = factory.config.get("RAG_FOLDERS")

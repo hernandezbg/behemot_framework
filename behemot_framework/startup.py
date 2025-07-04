@@ -333,10 +333,19 @@ async def initialize_rag(config):
     """Inicializa RAG forzando la ingestión de documentos"""
     logger.info("Iniciando inicialización de RAG")
     
-    # Verificar credenciales GCP
-    if not check_gcp_credentials():
-        logger.error("No se puede inicializar RAG: credenciales GCP incompletas")
-        return False
+    # Verificar si se usa GCP o almacenamiento local
+    bucket_name = config.get("GCP_BUCKET_NAME", "")
+    use_gcp = bool(bucket_name)
+    
+    if use_gcp:
+        # Solo verificar credenciales GCP si se va a usar
+        if not check_gcp_credentials():
+            logger.error("No se puede inicializar RAG: credenciales GCP incompletas")
+            return False
+        logger.info("🗃️ Usando almacenamiento GCP")
+    else:
+        logger.info("🗂️ Usando almacenamiento local (ChromaDB)")
+        # No requerir credenciales GCP para almacenamiento local
     
     # Obtener carpetas a ingerir
     folders = config.get("RAG_FOLDERS", [])
