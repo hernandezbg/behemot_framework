@@ -124,21 +124,48 @@ class Assistant:
                         # Manejar diferentes tipos de objetos de documento
                         if hasattr(doc, 'page_content'):
                             content = doc.page_content
-                            # Extraer información de página de metadata
+                            # Extraer información de página y fuente de metadata
                             page_info = ""
                             if hasattr(doc, 'metadata') and doc.metadata:
                                 page = doc.metadata.get('page')
                                 source = doc.metadata.get('source', '')
+                                filename = doc.metadata.get('filename', source)
+                                
+                                # Construir información de fuente
+                                source_parts = []
+                                if filename:
+                                    # Extraer solo el nombre del archivo sin ruta
+                                    import os
+                                    filename = os.path.basename(filename)
+                                    source_parts.append(f"📄 {filename}")
+                                
                                 if page is not None:
-                                    page_info = f" (Página {page + 1})"  # +1 porque páginas empiezan en 0
+                                    source_parts.append(f"Página {page + 1}")  # +1 porque páginas empiezan en 0
+                                
+                                if source_parts:
+                                    page_info = f" ({', '.join(source_parts)})"
                                 elif source:
-                                    page_info = f" (Fuente: {source})"
+                                    page_info = f" (📄 {source})"
                         elif hasattr(doc, 'content'):
                             content = doc.content
                             page_info = ""
                         elif isinstance(doc, dict):
                             content = doc.get("content", str(doc))
-                            page_info = f" (Página {doc.get('page', 'N/A')})" if 'page' in doc else ""
+                            # Construir información de fuente para dict
+                            source_parts = []
+                            if 'filename' in doc or 'source' in doc:
+                                filename = doc.get('filename', doc.get('source', ''))
+                                if filename:
+                                    import os
+                                    filename = os.path.basename(filename)
+                                    source_parts.append(f"📄 {filename}")
+                            
+                            if 'page' in doc:
+                                page_num = doc.get('page')
+                                if page_num is not None:
+                                    source_parts.append(f"Página {page_num + 1 if isinstance(page_num, int) else page_num}")
+                            
+                            page_info = f" ({', '.join(source_parts)})" if source_parts else ""
                         else:
                             content = str(doc)
                             page_info = ""
