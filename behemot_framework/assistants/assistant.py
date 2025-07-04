@@ -104,16 +104,32 @@ class Assistant:
                 # Procesar resultados combinados
                 if all_documents:
                     # Ordenar por score (similitud) y tomar los mejores
+                    def get_score(doc):
+                        if hasattr(doc, 'metadata') and isinstance(doc.metadata, dict):
+                            return doc.metadata.get("score", 0)
+                        elif isinstance(doc, dict):
+                            return doc.get("score", 0)
+                        else:
+                            return 0
+                    
                     best_documents = sorted(
                         all_documents, 
-                        key=lambda x: x.get("score", 0), 
+                        key=get_score, 
                         reverse=True
                     )[:self.rag_max_results]
                     
                     # Crear contexto combinado
                     context_parts = []
                     for i, doc in enumerate(best_documents, 1):
-                        content = doc.get("content", str(doc))
+                        # Manejar diferentes tipos de objetos de documento
+                        if hasattr(doc, 'page_content'):
+                            content = doc.page_content
+                        elif hasattr(doc, 'content'):
+                            content = doc.content
+                        elif isinstance(doc, dict):
+                            content = doc.get("content", str(doc))
+                        else:
+                            content = str(doc)
                         context_parts.append(f"Documento {i}:\n{content}")
                     
                     context_message = f"Información relevante de documentos:\n\n" + "\n\n---\n\n".join(context_parts)
