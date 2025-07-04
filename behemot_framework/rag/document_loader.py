@@ -47,28 +47,64 @@ class DocumentLoader:
         """Carga un archivo de texto"""
         logger.info(f"Cargando texto desde {file_path}")
         loader = TextLoader(file_path)
-        return loader.load()
+        docs = loader.load()
+        
+        # Agregar metadata de filename
+        filename = os.path.basename(file_path)
+        for doc in docs:
+            if not doc.metadata:
+                doc.metadata = {}
+            doc.metadata['filename'] = filename
+            
+        return docs
 
     @staticmethod
     def load_pdf(file_path: str) -> List[Document]:
         """Carga un archivo PDF"""
         logger.info(f"Cargando PDF desde {file_path}")
         loader = PyPDFLoader(file_path)
-        return loader.load()
+        docs = loader.load()
+        
+        # Agregar metadata de filename para mejor trazabilidad
+        filename = os.path.basename(file_path)
+        for doc in docs:
+            if not doc.metadata:
+                doc.metadata = {}
+            doc.metadata['filename'] = filename
+            
+        return docs
     
     @staticmethod
     def load_markdown(file_path: str) -> List[Document]:
         """Carga un archivo Markdown"""
         logger.info(f"Cargando Markdown desde {file_path}")
         loader = UnstructuredMarkdownLoader(file_path)
-        return loader.load()
+        docs = loader.load()
+        
+        # Agregar metadata de filename
+        filename = os.path.basename(file_path)
+        for doc in docs:
+            if not doc.metadata:
+                doc.metadata = {}
+            doc.metadata['filename'] = filename
+            
+        return docs
 
     @staticmethod
     def load_csv(file_path: str, csv_args: Optional[Dict[str, Any]] = None) -> List[Document]:
         """Carga un archivo CSV"""
         logger.info(f"Cargando CSV desde {file_path}")
         loader = CSVLoader(file_path, csv_args=csv_args or {})
-        return loader.load()
+        docs = loader.load()
+        
+        # Agregar metadata de filename
+        filename = os.path.basename(file_path)
+        for doc in docs:
+            if not doc.metadata:
+                doc.metadata = {}
+            doc.metadata['filename'] = filename
+            
+        return docs
 
     @staticmethod
     def load_url(url: str) -> List[Document]:
