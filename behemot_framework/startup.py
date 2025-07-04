@@ -126,8 +126,8 @@ async def _ingest_from_local(folder: str, config: Dict[str, Any]) -> bool:
         try:
             logger.info(f"📄 Procesando {len(files)} archivos con pipeline RAG")
             
-            # Usar rutas locales directamente
-            local_paths = [f"file://{os.path.abspath(file_path)}" for file_path in files]
+            # Usar rutas absolutas directamente (sin prefijo file://)
+            local_paths = [os.path.abspath(file_path) for file_path in files]
             
             # Ingerir documentos
             await rag_pipeline.aingest_documents(
