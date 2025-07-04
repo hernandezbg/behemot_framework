@@ -72,23 +72,57 @@ class Assistant:
             try:
                 from behemot_framework.rag.rag_manager import RAGManager
                 
-                # Realizar búsqueda automática
-                rag_result = await RAGManager.query_documents(
-                    query=mensaje_usuario,
-                    folder="",  # Buscar en todos los documentos
-                    k=self.rag_max_results
-                )
+                # Obtener todas las carpetas configuradas para RAG
+                rag_folders = Config.get("RAG_FOLDERS", ["docs"])
+                logger.info(f"🗂️ AUTO_RAG: Buscando en carpetas: {rag_folders}")
                 
-                if rag_result["success"] and rag_result["documents"]:
-                    logger.info(f"📚 AUTO_RAG: Encontrados {len(rag_result['documents'])} documentos relevantes")
+                # Buscar en todas las carpetas configuradas
+                all_documents = []
+                successful_searches = 0
+                
+                for folder in rag_folders:
+                    try:
+                        logger.info(f"📁 AUTO_RAG: Buscando en carpeta '{folder}'")
+                        folder_result = await RAGManager.query_documents(
+                            query=mensaje_usuario,
+                            folder_name=folder,
+                            k=self.rag_max_results
+                        )
+                        
+                        if folder_result["success"] and folder_result["documents"]:
+                            folder_docs = folder_result["documents"]
+                            all_documents.extend(folder_docs)
+                            successful_searches += 1
+                            logger.info(f"✅ AUTO_RAG: Encontrados {len(folder_docs)} documentos en '{folder}'")
+                        else:
+                            logger.info(f"ℹ️ AUTO_RAG: No se encontraron documentos en carpeta '{folder}'")
+                            
+                    except Exception as folder_error:
+                        logger.warning(f"⚠️ AUTO_RAG: Error buscando en carpeta '{folder}': {folder_error}")
+                        continue
+                
+                # Procesar resultados combinados
+                if all_documents:
+                    # Ordenar por score (similitud) y tomar los mejores
+                    best_documents = sorted(
+                        all_documents, 
+                        key=lambda x: x.get("score", 0), 
+                        reverse=True
+                    )[:self.rag_max_results]
                     
-                    # Agregar contexto al historial
-                    context_message = f"Información relevante de documentos:\n\n{rag_result['formatted_context']}"
+                    # Crear contexto combinado
+                    context_parts = []
+                    for i, doc in enumerate(best_documents, 1):
+                        content = doc.get("content", str(doc))
+                        context_parts.append(f"Documento {i}:\n{content}")
+                    
+                    context_message = f"Información relevante de documentos:\n\n" + "\n\n---\n\n".join(context_parts)
                     conversation.append({"role": "system", "content": context_message})
                     
+                    logger.info(f"📚 AUTO_RAG: {len(best_documents)} documentos relevantes de {successful_searches} carpetas")
                     logger.info(f"✅ AUTO_RAG: Contexto agregado al historial de conversación")
                 else:
-                    logger.info("ℹ️ AUTO_RAG: No se encontraron documentos relevantes")
+                    logger.info("ℹ️ AUTO_RAG: No se encontraron documentos relevantes en ninguna carpeta")
                     
             except Exception as e:
                 logger.error(f"❌ AUTO_RAG Error: {e}")
