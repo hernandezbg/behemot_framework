@@ -124,13 +124,26 @@ class Assistant:
                         # Manejar diferentes tipos de objetos de documento
                         if hasattr(doc, 'page_content'):
                             content = doc.page_content
+                            # Extraer información de página de metadata
+                            page_info = ""
+                            if hasattr(doc, 'metadata') and doc.metadata:
+                                page = doc.metadata.get('page')
+                                source = doc.metadata.get('source', '')
+                                if page is not None:
+                                    page_info = f" (Página {page + 1})"  # +1 porque páginas empiezan en 0
+                                elif source:
+                                    page_info = f" (Fuente: {source})"
                         elif hasattr(doc, 'content'):
                             content = doc.content
+                            page_info = ""
                         elif isinstance(doc, dict):
                             content = doc.get("content", str(doc))
+                            page_info = f" (Página {doc.get('page', 'N/A')})" if 'page' in doc else ""
                         else:
                             content = str(doc)
-                        context_parts.append(f"Documento {i}:\n{content}")
+                            page_info = ""
+                        
+                        context_parts.append(f"Documento {i}{page_info}:\n{content}")
                     
                     context_message = f"Información relevante de documentos:\n\n" + "\n\n---\n\n".join(context_parts)
                     conversation.append({"role": "system", "content": context_message})
