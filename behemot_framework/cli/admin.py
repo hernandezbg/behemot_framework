@@ -18,6 +18,8 @@ def create_yaml_config(assistant_name: str) -> str:
 # Configuración del modelo
 MODEL_PROVIDER: "openai"  # openai, gemini
 MODEL_NAME: "gpt-4o-mini"  # gpt-4o-mini, gpt-4o, gemini-1.5-pro, gemini-1.5-flash
+MODEL_TEMPERATURE: 0.7     # Creatividad del modelo (0.0 - 2.0)
+MODEL_MAX_TOKENS: 150      # Máximo tokens en respuestas
 
 # Prompt del sistema
 PROMPT_SISTEMA: |
@@ -272,7 +274,7 @@ tmp/
 """
 
 
-def startia(args):
+def create_agent(args):
     """Comando para crear un nuevo proyecto de asistente IA"""
     assistant_name = args.name
     current_dir = Path.cwd()
@@ -351,20 +353,20 @@ def main():
     
     subparsers = parser.add_subparsers(dest='command', help='Comandos disponibles')
     
-    # Comando startia
-    startia_parser = subparsers.add_parser(
-        'startia',
+    # Comando create-agent
+    create_agent_parser = subparsers.add_parser(
+        'create-agent',
         help='Crear un nuevo proyecto de asistente IA'
     )
-    startia_parser.add_argument(
+    create_agent_parser.add_argument(
         'name',
         help='Nombre del asistente a crear'
     )
     
     args = parser.parse_args()
     
-    if args.command == 'startia':
-        startia(args)
+    if args.command == 'create-agent':
+        create_agent(args)
     else:
         parser.print_help()
         sys.exit(1)

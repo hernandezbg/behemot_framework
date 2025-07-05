@@ -27,7 +27,7 @@ pip install git+https://github.com/hernandezbg/behemot_framework.git
 ### Paso 3: Generar Estructura del Proyecto
 
 ```bash
-behemot-admin startia mi_asistente
+behemot-admin create-agent mi_asistente
 ```
 
 Este comando crea automáticamente:
