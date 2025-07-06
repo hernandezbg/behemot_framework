@@ -58,6 +58,32 @@ RAG_FOLDERS: []
 RAG_EMBEDDING_PROVIDER: "openai"
 RAG_EMBEDDING_MODEL: "text-embedding-3-small"
 
+# MORPHING - Transformación dinámica del asistente (Opcional)
+# Descomentá para habilitar morphing
+# MORPHING:
+#   enabled: true
+#   default_morph: "general"
+#   settings:
+#     sensitivity: "medium"
+#     transition_style: "seamless"
+#   morphs:
+#     sales:
+#       personality: "Soy un asesor de ventas entusiasta que ayuda a encontrar la mejor opción"
+#       instant_triggers:
+#         - "quiero comprar"
+#         - "cuánto cuesta"
+#         - "precio"
+#         - "oferta"
+#       tools: ["search_products"]
+#     support:
+#       personality: "Soy un técnico paciente que resuelve problemas paso a paso"
+#       instant_triggers:
+#         - "no funciona"
+#         - "tengo un problema"
+#         - "error"
+#         - "ayuda"
+#       tools: ["search_knowledge_base"]
+
 # Configuración de logs
 LOG_LEVEL: "INFO"
 

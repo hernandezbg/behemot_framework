@@ -183,6 +183,36 @@ class Config:
             
             # Configuración de Gradio
             "GRADIO_SHARE": os.getenv("GRADIO_SHARE", "false").lower() in ("true", "1", "yes"),
+            
+            # Configuración de Morphing (por defecto deshabilitado)
+            "MORPHING": {
+                "enabled": os.getenv("MORPHING_ENABLED", "false").lower() in ("true", "1", "yes"),
+                "default_morph": "general",
+                "settings": {
+                    "sensitivity": "medium",
+                    "transition_style": "seamless"
+                },
+                "morphs": {
+                    "general": {
+                        "personality": "Soy un asistente útil y amigable",
+                        "model": "gpt-4o-mini",
+                        "temperature": 0.7
+                    }
+                },
+                "advanced": {
+                    "instant_layer": {
+                        "enabled": True
+                    },
+                    "gradual_layer": {
+                        "enabled": True,
+                        "confidence_threshold": 0.6
+                    },
+                    "transitions": {
+                        "prevent_morphing_loops": True,
+                        "preserve_context": True
+                    }
+                }
+            },
         }
 
     @classmethod

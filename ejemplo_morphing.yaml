@@ -1,0 +1,97 @@
+# ejemplo_morphing.yaml - Configuración de prueba para Live Agent Morphing
+
+# Configuración básica del asistente
+MODEL_PROVIDER: "openai"
+MODEL_NAME: "gpt-4o-mini"
+MODEL_TEMPERATURE: 0.7
+
+PROMPT_SISTEMA: |
+  Eres un asistente inteligente que puede especializarse según las necesidades del usuario.
+
+# MORPHING CONFIGURATION - FASE 2 CON ANÁLISIS INTELIGENTE
+MORPHING:
+  enabled: true
+  default_morph: "general"
+  
+  settings:
+    sensitivity: "medium"
+    transition_style: "seamless"
+    
+  # Configuración avanzada para Fase 2
+  advanced:
+    instant_layer:
+      enabled: true
+      
+    gradual_layer:
+      enabled: true
+      confidence_threshold: 0.6  # Umbral para activar morphs graduales
+      
+    transitions:
+      prevent_morphing_loops: true  # Anti-loop protection
+      preserve_context: true
+    
+  morphs:
+    # Morph general - siempre disponible
+    general:
+      personality: "Soy un asistente útil y amigable"
+      model: "gpt-4o-mini"
+      temperature: 0.7
+      
+    # Morph especializado en ventas
+    sales:
+      personality: "Soy un asesor de ventas entusiasta que ayuda a encontrar la mejor opción para cada cliente"
+      model: "gpt-4o-mini"
+      temperature: 0.8
+      
+      instant_triggers:
+        - "quiero comprar"
+        - "cuánto cuesta"
+        - "precio de"
+        - "ver productos"
+        - "oferta"
+        - "promoción"
+        - "descuento"
+        
+      # NUEVA: Configuración gradual para casos más complejos
+      gradual_triggers:
+        keywords: ["producto", "comparar", "mejor opción", "recomendación", "elegir"]
+        intents: ["purchase_inquiry", "price_comparison"]
+        min_score: 3
+        
+    # Morph especializado en soporte técnico
+    support:
+      personality: "Soy un técnico paciente que resuelve problemas paso a paso de manera metódica"
+      model: "gpt-4o-mini"
+      temperature: 0.3
+      
+      instant_triggers:
+        - "no funciona"
+        - "tengo un problema"
+        - "error"
+        - "ayuda con"
+        - "está roto"
+        - "falla"
+        - "bug"
+        
+      gradual_triggers:
+        keywords: ["lento", "cuelga", "instalación", "configuración", "resetear"]
+        intents: ["support_request"]
+        emotions: ["frustrated", "confused"]
+        min_score: 2
+        
+    # Morph creativo
+    creative:
+      personality: "Soy un asistente creativo lleno de ideas innovadoras y pensamiento original"
+      model: "gpt-4o-mini"
+      temperature: 0.9
+      
+      instant_triggers:
+        - "ayúdame a crear"
+        - "necesito ideas"
+        - "brainstorming"
+        - "inspiración"
+        - "diseñar"
+
+# Configuraciones adicionales
+SAFETY_LEVEL: "medium"
+LOG_LEVEL: "INFO"

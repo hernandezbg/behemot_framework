@@ -8,6 +8,7 @@ from behemot_framework.security.langchain_safety import LangChainSafetyFilter
 from behemot_framework.config import Config
 from behemot_framework.commandos.command_handler import CommandHandler
 from behemot_framework.core.middleware.date_middleware import DateMiddleware
+from behemot_framework.morphing import MorphingManager
 
 
 logger = logging.getLogger(__name__)
@@ -39,6 +40,14 @@ class Assistant:
             logger.info("🤖 AUTO_RAG activado - El asistente enriquecerá automáticamente las respuestas con documentos")
             self.rag_max_results = Config.get("RAG_MAX_RESULTS", 3)
             self.rag_similarity_threshold = Config.get("RAG_SIMILARITY_THRESHOLD", 0.6)
+        
+        # Configuración MORPHING
+        morphing_config = Config.get("MORPHING", {})
+        self.morphing_manager = MorphingManager(morphing_config)
+        if self.morphing_manager.is_enabled():
+            logger.info("🎭 MORPHING activado - El asistente puede transformarse según el contexto")
+        else:
+            logger.info("🚫 MORPHING deshabilitado")
 
     async def generar_respuesta(self, chat_id: str, mensaje_usuario: str) -> str:
 
@@ -65,6 +74,32 @@ class Assistant:
         conversation = DateMiddleware.inject_current_date(conversation)
 
         conversation.append({"role": "user", "content": mensaje_usuario})
+        
+        # MORPHING: Verificar si necesito cambiar de personalidad/configuración
+        morph_result = self.morphing_manager.process_message(mensaje_usuario, conversation)
+        current_morph_config = morph_result['morph_config']
+        
+        # Si hubo un cambio de morph, actualizo la configuración del modelo
+        if morph_result['should_morph']:
+            logger.info(f"🎭 Morphing activo: {morph_result['previous_morph']} → {morph_result['target_morph']}")
+            
+            # Actualizo el prompt del sistema si es necesario
+            new_personality = current_morph_config.get('personality', self.prompt_sistema)
+            if new_personality != self.prompt_sistema:
+                # Actualizo el primer mensaje del sistema en la conversación
+                for i, msg in enumerate(conversation):
+                    if msg.get('role') == 'system':
+                        conversation[i]['content'] = new_personality
+                        break
+                        
+            # Si hay continuity phrase, la agrego al contexto
+            continuity_phrase = morph_result.get('context', {}).get('continuity_phrase')
+            if continuity_phrase:
+                # Agrego una nota del sistema sobre la transición
+                conversation.append({
+                    "role": "system", 
+                    "content": f"Contexto de transición: {continuity_phrase}"
+                })
         
         # AUTO_RAG: Enriquecer automáticamente con contexto de documentos
         if self.auto_rag_enabled:
