@@ -16,7 +16,7 @@ def create_yaml_config(assistant_name: str) -> str:
 # Generado por behemot-admin
 
 # Configuración del modelo
-MODEL_PROVIDER: "openai"  # openai, gemini
+MODEL_PROVIDER: "openai"  # openai, gemini, vertex
 MODEL_NAME: "gpt-4o-mini"  # gpt-4o-mini, gpt-4o, gemini-1.5-pro, gemini-1.5-flash
 MODEL_TEMPERATURE: 0.7     # Creatividad del modelo (0.0 - 2.0)
 MODEL_MAX_TOKENS: 150      # Máximo tokens en respuestas
@@ -120,6 +120,10 @@ GPT_API_KEY=sk-...
 
 # Google Gemini (opcional)
 GEMINI_API_KEY=AI...
+
+# Google Vertex AI (opcional)
+VERTEX_PROJECT_ID=mi-proyecto-gcp
+VERTEX_LOCATION=us-central1
 
 # Redis (opcional)
 REDIS_PUBLIC_URL=redis://localhost:6379

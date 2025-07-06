@@ -123,6 +123,9 @@ class Config:
             # Configuración de API Keys
             "GPT_API_KEY": os.getenv("GPT_API_KEY", ""),
             "GEMINI_API_KEY": os.getenv("GEMINI_API_KEY", ""),
+            "VERTEX_API_KEY": os.getenv("VERTEX_API_KEY", ""),
+            "VERTEX_PROJECT_ID": os.getenv("VERTEX_PROJECT_ID", ""),
+            "VERTEX_LOCATION": os.getenv("VERTEX_LOCATION", "us-central1"),
             "ANTHROPIC_API_KEY": os.getenv("ANTHROPIC_API_KEY", ""),
             "TELEGRAM_TOKEN": os.getenv("TELEGRAM_TOKEN", ""),
 
@@ -170,7 +173,7 @@ class Config:
             """),
             
             # Modelo a utilizar
-            "MODEL_PROVIDER": os.getenv("MODEL_PROVIDER", "openai"),  # openai, gemini, anthropic
+            "MODEL_PROVIDER": os.getenv("MODEL_PROVIDER", "openai"),  # openai, gemini, vertex, anthropic
             "MODEL_NAME": os.getenv("MODEL_NAME", "gpt-4o-mini"),
             "MODEL_TEMPERATURE": float(os.getenv("MODEL_TEMPERATURE", "0.7")),
             "MODEL_MAX_TOKENS": int(os.getenv("MODEL_MAX_TOKENS", "150")),

@@ -60,7 +60,7 @@ Edita `config/mi_asistente.yaml` para personalizar tu asistente:
 
 ```yaml
 # Configuración del modelo
-MODEL_PROVIDER: "openai"  # openai, gemini
+MODEL_PROVIDER: "openai"  # openai, gemini, vertex
 MODEL_NAME: "gpt-4o-mini"
 
 # Prompt del sistema - Define la personalidad de tu asistente
@@ -223,6 +223,10 @@ GPT_API_KEY=sk-...
 # Google Gemini (opcional)
 GEMINI_API_KEY=AI...
 
+# Google Vertex AI (opcional)
+VERTEX_PROJECT_ID=mi-proyecto-gcp
+VERTEX_LOCATION=us-central1
+
 # Redis para persistencia (opcional)
 REDIS_PUBLIC_URL=redis://localhost:6379
 
@@ -246,7 +250,7 @@ GC_CLIENT_EMAIL=...
 
 ## 🌟 Características
 
-- **🤖 Múltiples Modelos IA**: OpenAI GPT y Google Gemini
+- **🤖 Múltiples Modelos IA**: OpenAI GPT, Google Gemini y Vertex AI
 - **📱 Múltiples Canales**: API REST, Telegram, WhatsApp, Google Chat
 - **🧠 RAG Integrado**: Lee carpetas locales, GCP, S3, Google Drive automáticamente
 - **🔧 Herramientas Extensibles**: Sistema de plugins simple

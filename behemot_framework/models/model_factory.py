@@ -73,6 +73,7 @@ class ModelFactory:
                 "openai": "GPT_API_KEY",
                 "gpt": "GPT_API_KEY",
                 "gemini": "GEMINI_API_KEY",
+                "vertex": "VERTEX_API_KEY",
                 "anthropic": "ANTHROPIC_API_KEY",
             }
             
