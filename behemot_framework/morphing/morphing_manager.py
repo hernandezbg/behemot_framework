@@ -6,6 +6,8 @@ from .gradual_analyzer import GradualMorphAnalyzer
 from .state_manager import MorphStateManager
 from .transition_manager import TransitionManager
 from .metrics import morph_metrics
+from .feedback_system import MorphingFeedbackSystem
+from .ab_testing import MorphingABTesting
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +44,12 @@ class MorphingManager:
         self.gradual_analyzer = GradualMorphAnalyzer(self.morphs_config)
         self.state_manager = MorphStateManager()
         self.transition_manager = TransitionManager(self.transition_style)
+        
+        # Sistema de feedback (se inicializa después con Redis)
+        self.feedback_system = None
+        
+        # Sistema de A/B testing (se inicializa después con Redis)
+        self.ab_testing = None
         
         # Configuración avanzada
         advanced = morphing_config.get('advanced', {})
@@ -84,6 +92,10 @@ class MorphingManager:
         # Capa 1: Verifico instant triggers (prioridad alta)
         instant_decision = self.instant_triggers.check(user_input, self.current_morph)
         
+        # Aplicar ajustes de confianza aprendidos
+        if instant_decision:
+            instant_decision = self._apply_learned_adjustments(instant_decision, user_input)
+        
         if instant_decision and instant_decision.confidence >= 0.9:
             logger.info(f"⚡ Instant trigger detectado: {self.current_morph} → {instant_decision.morph_name}")
             if self._should_allow_morph_change(instant_decision.morph_name):
@@ -97,17 +109,25 @@ class MorphingManager:
             gradual_result = self.gradual_analyzer.analyze(user_input, conversation, self.current_morph)
             
             if gradual_result and gradual_result['confidence'] >= self.confidence_threshold:
-                logger.info(f"📊 Análisis gradual sugiere: {self.current_morph} → {gradual_result['morph_name']} (conf: {gradual_result['confidence']:.2f})")
-                if self._should_allow_morph_change(gradual_result['morph_name']):
-                    # Creo un MorphDecision compatible desde el resultado gradual
-                    gradual_decision = MorphDecision(
-                        morph_name=gradual_result['morph_name'],
-                        confidence=gradual_result['confidence'],
-                        reason=gradual_result['reason']
-                    )
-                    return self._execute_morph_change(gradual_decision, conversation, "gradual")
+                # Creo un MorphDecision compatible desde el resultado gradual
+                gradual_decision = MorphDecision(
+                    morph_name=gradual_result['morph_name'],
+                    confidence=gradual_result['confidence'],
+                    reason=gradual_result['reason']
+                )
+                
+                # Aplicar ajustes de confianza aprendidos
+                gradual_decision = self._apply_learned_adjustments(gradual_decision, user_input)
+                
+                # Revisar si aún cumple el umbral después del ajuste
+                if gradual_decision.confidence >= self.confidence_threshold:
+                    logger.info(f"📊 Análisis gradual sugiere: {self.current_morph} → {gradual_decision.morph_name} (conf: {gradual_decision.confidence:.2f})")
+                    if self._should_allow_morph_change(gradual_decision.morph_name):
+                        return self._execute_morph_change(gradual_decision, conversation, "gradual")
+                    else:
+                        morph_metrics.record_anti_loop_block(gradual_decision.morph_name)
                 else:
-                    morph_metrics.record_anti_loop_block(gradual_result['morph_name'])
+                    logger.debug(f"📉 Decisión gradual rechazada por ajuste de confianza aprendido: {gradual_result['confidence']:.2f} → {gradual_decision.confidence:.2f}")
         
         # No hay cambio necesario, continúo con el morph actual
         logger.debug(f"📝 Manteniendo morph actual: {self.current_morph}")
@@ -256,3 +276,188 @@ class MorphingManager:
     def log_metrics_summary(self):
         """Registro un resumen de métricas en los logs"""
         morph_metrics.log_summary()
+    
+    def set_redis_client(self, redis_client):
+        """
+        Inicializa el sistema de feedback con cliente Redis.
+        Debe llamarse después de la inicialización del manager.
+        """
+        if redis_client:
+            self.feedback_system = MorphingFeedbackSystem(redis_client)
+            self.ab_testing = MorphingABTesting(redis_client)
+            logger.info("🧠 Sistema de feedback inicializado con Redis")
+            logger.info("🧪 Sistema de A/B testing inicializado con Redis")
+        else:
+            logger.info("ℹ️ Sistema de feedback deshabilitado (sin Redis)")
+            logger.info("ℹ️ Sistema de A/B testing deshabilitado (sin Redis)")
+    
+    def record_morph_feedback(self, success: bool, user_id: str = None,
+                             trigger: str = "", confidence: float = 0.0):
+        """
+        Registra feedback sobre la transformación actual.
+        
+        Args:
+            success: Si la transformación fue exitosa
+            user_id: ID del usuario (opcional)
+            trigger: Input que causó la transformación
+            confidence: Confianza de la decisión
+        """
+        if self.feedback_system and self.enabled:
+            self.feedback_system.record_feedback(
+                morph=self.current_morph,
+                success=success,
+                trigger=trigger,
+                confidence=confidence,
+                user_id=user_id
+            )
+    
+    def detect_implicit_feedback(self, user_messages: List[str]) -> Optional[bool]:
+        """
+        Detecta feedback implícito del usuario.
+        
+        Returns:
+            True si positivo, False si negativo, None si no claro
+        """
+        if self.feedback_system:
+            return self.feedback_system.detect_implicit_feedback(
+                user_messages, self.current_morph
+            )
+        return None
+    
+    def get_learning_summary(self) -> Dict[str, Any]:
+        """
+        Obtiene resumen del aprendizaje del sistema.
+        """
+        if self.feedback_system:
+            return self.feedback_system.get_learning_summary()
+        return {"enabled": False}
+    
+    def _apply_learned_adjustments(self, decision: MorphDecision, user_input: str):
+        """
+        Aplica ajustes de confianza aprendidos al feedback.
+        """
+        if not self.feedback_system:
+            return decision
+            
+        # Obtener ajuste aprendido
+        adjustment = self.feedback_system.get_confidence_adjustment(
+            decision.morph_name, user_input
+        )
+        
+        if adjustment != 0:
+            original_confidence = decision.confidence
+            decision.confidence = max(0.0, min(1.0, decision.confidence + adjustment))
+            
+            logger.debug(f"📈 Ajuste de confianza aplicado: {original_confidence:.2f} → "
+                        f"{decision.confidence:.2f} (ajuste: {adjustment:+.2f})")
+            
+        return decision
+    
+    # Métodos para A/B Testing
+    
+    def apply_ab_test_config(self, user_id: str, test_id: str = None):
+        """
+        Aplica configuración de A/B testing si existe test activo.
+        
+        Args:
+            user_id: ID del usuario
+            test_id: ID del test específico (opcional)
+        """
+        if not self.ab_testing:
+            return
+            
+        try:
+            # Si no se especifica test_id, buscar tests activos
+            if test_id is None:
+                # Por ahora usar un test por defecto si existe
+                test_id = "confidence_threshold_test"
+                
+            variant = self.ab_testing.get_variant_for_user(user_id, test_id)
+            
+            if variant:
+                config_overrides = variant["config"]
+                
+                # Aplicar overrides de configuración
+                if "gradual_layer" in config_overrides:
+                    gradual_config = config_overrides["gradual_layer"]
+                    if "confidence_threshold" in gradual_config:
+                        self.confidence_threshold = gradual_config["confidence_threshold"]
+                        logger.debug(f"🧪 A/B Test aplicado: confidence_threshold = {self.confidence_threshold}")
+                
+                if "settings" in config_overrides:
+                    settings_config = config_overrides["settings"]
+                    if "sensitivity" in settings_config:
+                        # Aplicar sensibilidad (podría afectar otros parámetros)
+                        sensitivity = settings_config["sensitivity"]
+                        logger.debug(f"🧪 A/B Test aplicado: sensitivity = {sensitivity}")
+                        
+                return variant["variant_id"]
+                
+        except Exception as e:
+            logger.debug(f"Error aplicando configuración A/B: {e}")
+            
+        return None
+    
+    def record_ab_interaction(self, user_id: str, test_id: str, 
+                             success: bool, confidence: float, 
+                             transformation_time_ms: float):
+        """
+        Registra una interacción para análisis A/B.
+        
+        Args:
+            user_id: ID del usuario
+            test_id: ID del test
+            success: Si la transformación fue exitosa
+            confidence: Nivel de confianza
+            transformation_time_ms: Tiempo de transformación
+        """
+        if self.ab_testing:
+            self.ab_testing.record_interaction(
+                user_id=user_id,
+                test_id=test_id,
+                success=success,
+                confidence=confidence,
+                transformation_time_ms=transformation_time_ms
+            )
+    
+    def create_ab_test(self, test_config) -> bool:
+        """
+        Crea un nuevo test A/B.
+        
+        Args:
+            test_config: Configuración del test A/B
+            
+        Returns:
+            True si se creó exitosamente
+        """
+        if self.ab_testing:
+            return self.ab_testing.create_test(test_config)
+        return False
+    
+    def get_ab_test_results(self, test_id: str) -> Dict[str, Any]:
+        """
+        Obtiene resultados de un test A/B.
+        
+        Args:
+            test_id: ID del test
+            
+        Returns:
+            Resultados del test
+        """
+        if self.ab_testing:
+            return self.ab_testing.get_test_results(test_id)
+        return {}
+    
+    def get_optimal_config(self, test_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Obtiene la configuración óptima basada en resultados A/B.
+        
+        Args:
+            test_id: ID del test
+            
+        Returns:
+            Configuración ganadora
+        """
+        if self.ab_testing:
+            return self.ab_testing.get_optimal_config(test_id)
+        return None

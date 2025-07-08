@@ -46,6 +46,16 @@ class Assistant:
         self.morphing_manager = MorphingManager(morphing_config)
         if self.morphing_manager.is_enabled():
             logger.info("🎭 MORPHING activado - El asistente puede transformarse según el contexto")
+            
+            # Inicializar sistema de feedback con Redis si está disponible
+            try:
+                from behemot_framework.context import redis_client
+                if redis_client:
+                    self.morphing_manager.set_redis_client(redis_client)
+                else:
+                    logger.info("ℹ️ Sistema de feedback de morphing deshabilitado (sin Redis)")
+            except ImportError:
+                logger.info("ℹ️ Sistema de feedback de morphing deshabilitado (Redis no disponible)")
         else:
             logger.info("🚫 MORPHING deshabilitado")
 
@@ -336,6 +346,11 @@ class Assistant:
                     
                 # Guardar la respuesta final
                 conversation.append({"role": "assistant", "content": final_response})
+                
+                # Detectar feedback implícito si morphing está activo
+                if self.morphing_manager.is_enabled():
+                    self._detect_and_record_feedback(chat_id, conversation, mensaje_usuario)
+                
                 save_conversation(chat_id, conversation)
                 
                 # Devolver ambas respuestas separadas para que el conector las envíe como mensajes separados
@@ -349,6 +364,11 @@ class Assistant:
                     answer = safety_result["filtered_content"]
                 
             conversation.append({"role": "assistant", "content": answer})
+            
+            # Detectar feedback implícito si morphing está activo
+            if self.morphing_manager.is_enabled():
+                self._detect_and_record_feedback(chat_id, conversation, mensaje_usuario)
+            
             save_conversation(chat_id, conversation)
             return answer
         
@@ -381,6 +401,11 @@ class Assistant:
                     final_response = safety_result["filtered_content"]
                 
             conversation.append({"role": "assistant", "content": final_response})
+            
+            # Detectar feedback implícito si morphing está activo
+            if self.morphing_manager.is_enabled():
+                self._detect_and_record_feedback(chat_id, conversation, mensaje_usuario)
+            
             save_conversation(chat_id, conversation)
             return final_response
         
@@ -389,4 +414,33 @@ class Assistant:
         conversation.append({"role": "assistant", "content": answer})
         save_conversation(chat_id, conversation)
         return answer
+    
+    def _detect_and_record_feedback(self, chat_id: str, conversation: list, user_input: str):
+        """
+        Detecta y registra feedback implícito sobre transformaciones de morphing.
+        """
+        try:
+            # Extraer solo los mensajes del usuario de los últimos intercambios
+            user_messages = []
+            for msg in conversation[-4:]:  # Últimos 4 mensajes
+                if msg.get('role') == 'user':
+                    user_messages.append(msg.get('content', ''))
+            
+            if len(user_messages) >= 1:
+                # Detectar feedback implícito
+                feedback = self.morphing_manager.detect_implicit_feedback(user_messages)
+                
+                if feedback is not None:
+                    # Registrar el feedback
+                    self.morphing_manager.record_morph_feedback(
+                        success=feedback,
+                        user_id=chat_id,
+                        trigger=user_input[:50],  # Primeros 50 chars del trigger
+                        confidence=0.7  # Confianza media para feedback implícito
+                    )
+                    
+                    logger.debug(f"📝 Feedback implícito detectado: {'positivo' if feedback else 'negativo'} "
+                                f"para morph '{self.morphing_manager.get_current_morph()}'")
+        except Exception as e:
+            logger.debug(f"Error detectando feedback: {e}")
         
