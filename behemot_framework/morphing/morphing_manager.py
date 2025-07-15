@@ -27,15 +27,13 @@ class MorphingManager:
         self.config = morphing_config
         self.enabled = morphing_config.get('enabled', False)
         
-        # Siempre inicializo default_morph, incluso si morphing está deshabilitado
+        # Siempre inicializo default_morph y morphs_config, incluso si morphing está deshabilitado
         self.default_morph = morphing_config.get('default_morph', 'general')
+        self.morphs_config = morphing_config.get('morphs', {})
         
         if not self.enabled:
             logger.info("🚫 Morphing está deshabilitado en la configuración")
             return
-        
-        # Extraigo configuraciones básicas
-        self.morphs_config = morphing_config.get('morphs', {})
         
         # Configuración de comportamiento
         settings = morphing_config.get('settings', {})
