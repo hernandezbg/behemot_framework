@@ -20,6 +20,14 @@ except ImportError:
         warnings.filterwarnings("ignore", category=DeprecationWarning)
         from langchain_community.vectorstores import Chroma
 
+# Importar Redis vector store
+try:
+    from langchain_community.vectorstores import Redis as RedisVectorStore
+    REDIS_AVAILABLE = True
+except ImportError:
+    REDIS_AVAILABLE = False
+    logger.warning("Redis vector store no disponible. Instale redis-py para usar Redis como almacenamiento de vectores.")
+
 
 logger = logging.getLogger(__name__)
 
@@ -224,3 +232,108 @@ class VectorStoreManager:
             logger.info(f"Colección '{collection_name}' eliminada correctamente")
         except ValueError as e:
             logger.warning(f"No se pudo eliminar la colección: {e}")
+
+    # Métodos para Redis Vector Store
+    @staticmethod
+    def create_redis_index(
+        documents: List[Document],
+        embeddings: Embeddings,
+        redis_url: str,
+        index_name: str = "default_index",
+        **kwargs
+    ) -> 'RedisVectorStore':
+        """
+        Crea un índice Redis a partir de documentos
+        
+        Args:
+            documents: Lista de documentos a indexar
+            embeddings: Modelo de embeddings a usar
+            redis_url: URL de conexión a Redis
+            index_name: Nombre del índice
+            **kwargs: Argumentos adicionales para Redis
+            
+        Returns:
+            Instancia de RedisVectorStore con los documentos indexados
+        """
+        if not REDIS_AVAILABLE:
+            raise ImportError("Redis vector store no disponible. Instale redis-py")
+            
+        logger.info(f"Creando índice Redis '{index_name}' con {len(documents)} documentos")
+        
+        try:
+            # Crear índice Redis desde documentos
+            vectorstore = RedisVectorStore.from_documents(
+                documents=documents,
+                embedding=embeddings,
+                redis_url=redis_url,
+                index_name=index_name,
+                **kwargs
+            )
+            
+            logger.info(f"Índice Redis '{index_name}' creado exitosamente")
+            return vectorstore
+            
+        except Exception as e:
+            logger.error(f"Error al crear índice Redis: {e}")
+            raise
+
+    @staticmethod
+    def load_redis_index(
+        embeddings: Embeddings,
+        redis_url: str,
+        index_name: str = "default_index",
+        **kwargs
+    ) -> 'RedisVectorStore':
+        """
+        Carga un índice Redis existente
+        
+        Args:
+            embeddings: Modelo de embeddings a usar
+            redis_url: URL de conexión a Redis
+            index_name: Nombre del índice
+            **kwargs: Argumentos adicionales para Redis
+            
+        Returns:
+            Instancia de RedisVectorStore
+        """
+        if not REDIS_AVAILABLE:
+            raise ImportError("Redis vector store no disponible. Instale redis-py")
+            
+        logger.info(f"Cargando índice Redis '{index_name}'")
+        
+        try:
+            vectorstore = RedisVectorStore(
+                redis_url=redis_url,
+                index_name=index_name,
+                embedding=embeddings,
+                **kwargs
+            )
+            
+            logger.info(f"Índice Redis '{index_name}' cargado exitosamente")
+            return vectorstore
+            
+        except Exception as e:
+            logger.error(f"Error al cargar índice Redis: {e}")
+            raise
+
+    @staticmethod
+    def add_documents_to_redis(
+        vectorstore: 'RedisVectorStore',
+        documents: List[Document]
+    ) -> 'RedisVectorStore':
+        """
+        Añade documentos a un índice Redis existente
+        
+        Args:
+            vectorstore: Índice Redis existente
+            documents: Nuevos documentos a añadir
+            
+        Returns:
+            Instancia de RedisVectorStore actualizada
+        """
+        logger.info(f"Añadiendo {len(documents)} documentos al índice Redis")
+        
+        vectorstore.add_documents(documents)
+        logger.info("Documentos añadidos al índice Redis exitosamente")
+        
+        return vectorstore

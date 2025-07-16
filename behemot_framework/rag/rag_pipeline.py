@@ -34,20 +34,26 @@ class RAGPipeline:
         persist_directory: str = "chroma_db",
         collection_name: str = "default_collection",
         client_settings: Optional[Any] = None,
+        storage_type: str = "chroma",
+        redis_url: Optional[str] = None,
     ):
         """
         Inicializa el pipeline RAG
         
         Args:
-            embedding_provider: Proveedor de embeddings ('openai', 'huggingface')
+            embedding_provider: Proveedor de embeddings ('openai', 'huggingface', 'google')
             embedding_model: Modelo de embeddings a usar
             persist_directory: Directorio para persistencia de Chroma
             collection_name: Nombre de la colección
             client_settings: Configuración opcional del cliente Chroma
+            storage_type: Tipo de almacenamiento ('chroma' o 'redis')
+            redis_url: URL de conexión a Redis (requerido si storage_type='redis')
         """
         self.embedding_provider = embedding_provider
         self.embedding_model = embedding_model
         self.persist_directory = persist_directory
+        self.storage_type = storage_type
+        self.redis_url = redis_url
         self.collection_name = collection_name
         self.client_settings = client_settings
         
@@ -64,17 +70,34 @@ class RAGPipeline:
         self.embeddings = EmbeddingManager.get_embeddings(**embedding_params)
         
         self.vectorstore = None
-        if os.path.exists(persist_directory):
-            try:
-                self.vectorstore = VectorStoreManager.load_chroma_index(
-                    self.embeddings, 
-                    persist_directory, 
-                    collection_name,
-                    client_settings=client_settings
-                )
-                logger.info(f"Colección '{collection_name}' cargada correctamente desde {persist_directory}")
-            except Exception as e:
-                logger.error(f"Error al cargar la colección: {e}")
+        
+        # Inicializar vectorstore según el tipo
+        if self.storage_type == "redis":
+            if self.redis_url:
+                try:
+                    self.vectorstore = VectorStoreManager.load_redis_index(
+                        self.embeddings, 
+                        self.redis_url,
+                        collection_name
+                    )
+                    logger.info(f"Colección Redis '{collection_name}' cargada correctamente")
+                except Exception as e:
+                    logger.error(f"Error al cargar la colección Redis: {e}")
+                    # Continuar sin vectorstore, se creará cuando sea necesario
+            else:
+                logger.warning("Redis URL no configurada, no se puede cargar el índice")
+        else:  # chroma (default)
+            if os.path.exists(persist_directory):
+                try:
+                    self.vectorstore = VectorStoreManager.load_chroma_index(
+                        self.embeddings, 
+                        persist_directory, 
+                        collection_name,
+                        client_settings=client_settings
+                    )
+                    logger.info(f"Colección '{collection_name}' cargada correctamente desde {persist_directory}")
+                except Exception as e:
+                    logger.error(f"Error al cargar la colección: {e}")
     
     def ingest_documents(
         self,
@@ -133,18 +156,31 @@ class RAGPipeline:
         
         logger.info(f"Documentos procesados en {len(chunks)} chunks")
         
-        # Crear o actualizar vectorstore
-        if self.vectorstore is None:
-            self.vectorstore = VectorStoreManager.create_chroma_index(
-                chunks, 
-                self.embeddings, 
-                self.persist_directory,
-                self.collection_name
-            )
-        else:
-            self.vectorstore = VectorStoreManager.add_documents(
-                self.vectorstore, chunks
-            )
+        # Crear o actualizar vectorstore según el tipo
+        if self.storage_type == "redis":
+            if self.vectorstore is None:
+                self.vectorstore = VectorStoreManager.create_redis_index(
+                    chunks, 
+                    self.embeddings, 
+                    self.redis_url,
+                    self.collection_name
+                )
+            else:
+                self.vectorstore = VectorStoreManager.add_documents_to_redis(
+                    self.vectorstore, chunks
+                )
+        else:  # chroma (default)
+            if self.vectorstore is None:
+                self.vectorstore = VectorStoreManager.create_chroma_index(
+                    chunks, 
+                    self.embeddings, 
+                    self.persist_directory,
+                    self.collection_name
+                )
+            else:
+                self.vectorstore = VectorStoreManager.add_documents(
+                    self.vectorstore, chunks
+                )
         
         return self.vectorstore
     

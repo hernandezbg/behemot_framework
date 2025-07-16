@@ -57,8 +57,11 @@ class RAGManager:
         persist_directory = config.get("RAG_PERSIST_DIRECTORY", "chroma_db")
         embedding_provider = config.get("RAG_EMBEDDING_PROVIDER", "openai")
         embedding_model = config.get("RAG_EMBEDDING_MODEL", "text-embedding-3-small")
+        storage_type = config.get("RAG_STORAGE", "chroma")
+        redis_url = config.get("REDIS_PUBLIC_URL") or config.get("REDIS_URL")
         
         logger.info(f"Usando directorio '{persist_directory}' con proveedor '{embedding_provider}' y modelo '{embedding_model}'")
+        logger.info(f"Tipo de almacenamiento: {storage_type}")
         
         # Configuración específica para entorno de producción
         client_settings = None
@@ -74,7 +77,9 @@ class RAGManager:
             embedding_model=embedding_model,
             persist_directory=persist_directory,
             collection_name=collection_name,
-            client_settings=client_settings
+            client_settings=client_settings,
+            storage_type=storage_type,
+            redis_url=redis_url
         )
         
         # Almacenar en caché para futuras solicitudes
