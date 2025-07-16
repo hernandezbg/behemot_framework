@@ -119,7 +119,9 @@ async def _ingest_from_local(folder: str, config: Dict[str, Any]) -> bool:
             embedding_provider=config.get("RAG_EMBEDDING_PROVIDER", "openai"),
             embedding_model=config.get("RAG_EMBEDDING_MODEL", "text-embedding-3-small"),
             persist_directory=config.get("RAG_PERSIST_DIRECTORY", "chroma_db"),
-            collection_name=folder.replace("/", "_").replace("\\", "_")
+            collection_name=folder.replace("/", "_").replace("\\", "_"),
+            storage_type=config.get("RAG_STORAGE", "chroma"),
+            redis_url=config.get("REDIS_PUBLIC_URL") or config.get("REDIS_URL")
         )
         
         # Procesar todos los archivos de una vez usando el método aingest_documents
@@ -164,6 +166,16 @@ async def _ingest_from_gcp(folder: str, config: Dict[str, Any]) -> bool:
         if not check_gcp_credentials():
             logger.error("No se puede ingerir desde GCP: credenciales incompletas")
             return False
+        
+        # Configurar pipeline RAG con configuración del sistema
+        rag_pipeline = RAGPipeline(
+            embedding_provider=config.get("RAG_EMBEDDING_PROVIDER", "openai"),
+            embedding_model=config.get("RAG_EMBEDDING_MODEL", "text-embedding-3-small"),
+            persist_directory=config.get("RAG_PERSIST_DIRECTORY", "chroma_db"),
+            collection_name=folder.replace("/", "_").replace("\\", "_"),
+            storage_type=config.get("RAG_STORAGE", "chroma"),
+            redis_url=config.get("REDIS_PUBLIC_URL") or config.get("REDIS_URL")
+        )
         
         # [Aquí iría todo el código GCP original]
         # Por simplicidad, retorno False por ahora
