@@ -83,10 +83,9 @@ class ChromaClientManager:
             logger.info(f"📦 Creando nuevo cliente ChromaDB para: {persist_directory}")
             
             if client_settings is None:
+                # Usar la nueva configuración de ChromaDB
                 client_settings = Settings(
-                    anonymized_telemetry=False,
-                    allow_reset=True,  # Permitir reset en caso de conflictos
-                    is_persistent=bool(persist_directory)
+                    anonymized_telemetry=False
                 )
             
             if persist_directory:

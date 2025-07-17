@@ -72,8 +72,8 @@ class RAGManager:
         # Configuración específica para entorno de producción
         client_settings = None
         if is_production:
+            # Nueva configuración de ChromaDB sin parámetros obsoletos
             client_settings = chromadb.config.Settings(
-                chroma_db_impl=config.get("RAG_CHROMA_IMPL", "duckdb+parquet"),
                 anonymized_telemetry=config.get("RAG_TELEMETRY_ENABLED", False)
             )
         
