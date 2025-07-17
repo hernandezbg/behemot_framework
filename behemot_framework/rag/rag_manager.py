@@ -60,6 +60,12 @@ class RAGManager:
         storage_type = config.get("RAG_STORAGE", "chroma")
         redis_url = config.get("REDIS_PUBLIC_URL") or config.get("REDIS_URL")
         
+        # Si estamos en Railway y se configuró Redis, forzar usar chroma (comportamiento original)
+        if is_production and storage_type == "redis":
+            logger.warning("⚠️ Redis en Railway no tiene RediSearch. Usando ChromaDB como antes")
+            storage_type = "chroma"
+            # Mantener persist_directory para compatibilidad con el flujo original
+        
         logger.info(f"Usando directorio '{persist_directory}' con proveedor '{embedding_provider}' y modelo '{embedding_model}'")
         logger.info(f"Tipo de almacenamiento: {storage_type}")
         
