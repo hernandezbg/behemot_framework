@@ -32,6 +32,44 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
+class ChromaClientManager:
+    """Singleton para gestionar clientes ChromaDB y evitar conflictos"""
+    
+    _clients = {}  # Cache de clientes por configuración
+    
+    @classmethod
+    def get_client(cls, persist_directory: str = None, client_settings: Optional[Any] = None):
+        """Obtiene o crea un cliente ChromaDB reutilizable"""
+        import chromadb
+        from chromadb.config import Settings
+        
+        # Crear clave única para el cliente
+        key = f"{persist_directory}_{hash(str(client_settings))}"
+        
+        if key not in cls._clients:
+            logger.info(f"Creando nuevo cliente ChromaDB para: {persist_directory}")
+            
+            if client_settings is None:
+                client_settings = Settings(anonymized_telemetry=False)
+            
+            if persist_directory:
+                client = chromadb.PersistentClient(
+                    path=persist_directory,
+                    settings=client_settings
+                )
+            else:
+                client = chromadb.Client(settings=client_settings)
+            
+            cls._clients[key] = client
+            
+        return cls._clients[key]
+    
+    @classmethod
+    def reset_clients(cls):
+        """Reinicia todos los clientes (útil para testing)"""
+        cls._clients = {}
+
+
 class VectorStoreManager:
     """Clase para gestionar bases de datos vectoriales con Chroma"""
 
@@ -58,23 +96,10 @@ class VectorStoreManager:
         """
         logger.info(f"Creando índice Chroma con {len(documents)} documentos en colección '{collection_name}'")
         
-        import chromadb
-        from chromadb.config import Settings
-
-        # Crear cliente con la nueva configuración recomendada
-        # Deshabilitar telemetría anónima
-        if client_settings is None:
-            client_settings = Settings(anonymized_telemetry=False)
-
-        if persist_directory:
-            client = chromadb.PersistentClient(
-                path=persist_directory,
-                settings=client_settings
-            )
-        else:
-            client = chromadb.Client(settings=client_settings)
+        # Usar el singleton para obtener el cliente
+        client = ChromaClientManager.get_client(persist_directory, client_settings)
         
-        # Crear instancia de Chroma con el nuevo cliente
+        # Crear instancia de Chroma con el cliente reutilizable
         vectorstore = Chroma.from_documents(
             documents=documents,
             embedding=embeddings,
@@ -110,32 +135,25 @@ class VectorStoreManager:
             raise FileNotFoundError(f"No se encontró directorio de persistencia en {persist_directory}")
         
         try:
-            # Usar la forma recomendada para crear el cliente Chroma
-            import chromadb
-            from chromadb.config import Settings
+            # Usar el singleton para obtener el cliente
+            client = ChromaClientManager.get_client(persist_directory, client_settings)
 
-            # Deshabilitar telemetría anónima
-            if client_settings is None:
-                client_settings = Settings(anonymized_telemetry=False)
-
-            # Crear argumentos para Chroma
+            # Crear argumentos para Chroma con el cliente reutilizable
             chroma_args = {
-                "persist_directory": persist_directory,
                 "embedding_function": embeddings,
                 "collection_name": collection_name,
-                "client_settings": client_settings
+                "client": client
             }
             
-            # Importar directamente de langchain_chroma si está disponible
-            try:
-                from langchain_chroma import Chroma as ChromaNew
-                logger.info("Usando langchain_chroma.Chroma")
-                return ChromaNew(**chroma_args)
-            except ImportError:
-                # Fallback a la versión anterior
-                logger.info("Usando langchain_community.vectorstores.Chroma")
-                from langchain_community.vectorstores import Chroma
-                return Chroma(**chroma_args)
+            # Crear instancia de Chroma con el cliente reutilizable
+            logger.info("Usando langchain_chroma.Chroma")
+            vectorstore = Chroma(
+                embedding_function=embeddings,
+                collection_name=collection_name,
+                client=client
+            )
+            
+            return vectorstore
                 
         except Exception as e:
             logger.error(f"Error al cargar Chroma: {e}")
@@ -222,11 +240,10 @@ class VectorStoreManager:
             persist_directory: Directorio donde está persistido
             collection_name: Nombre de la colección a eliminar
         """
-        import chromadb
-        
         logger.info(f"Eliminando colección '{collection_name}' en {persist_directory}")
         
-        client = chromadb.PersistentClient(path=persist_directory)
+        # Usar el singleton para obtener el cliente
+        client = ChromaClientManager.get_client(persist_directory)
         try:
             client.delete_collection(name=collection_name)
             logger.info(f"Colección '{collection_name}' eliminada correctamente")
