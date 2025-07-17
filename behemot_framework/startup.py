@@ -277,19 +277,22 @@ async def initialize_rag(config):
     
     logger.info(f"Carpetas a ingerir: {folders}")
     
-    # Forzar reinicio/recreación de colecciones en entorno de producción
+    # Resetear singleton ChromaDB en entorno de producción para evitar conflictos
     if os.getenv("RAILWAY_ENVIRONMENT"):
-        persist_directory = "chroma_db"  # Usar 'chroma_db' consistentemente
-        
-        for folder in folders:
-            collection_name = folder.replace("/", "_") if folder else "default"
-            try:
-                # Eliminar colección si existe
-                from behemot_framework.rag.vector_store import VectorStoreManager
-                VectorStoreManager.delete_collection(persist_directory, collection_name)
-                logger.info(f"Colección {collection_name} eliminada para reinicialización")
-            except Exception as e:
-                logger.warning(f"Error al eliminar colección: {e}")
+        try:
+            from behemot_framework.rag.vector_store import ChromaClientManager
+            ChromaClientManager.reset_clients()
+            logger.info("🔄 Singleton ChromaDB reseteado para reinicialización")
+        except Exception as e:
+            logger.warning(f"⚠️ Error reseteando singleton ChromaDB: {e}")
+            
+        # También resetear cache de pipelines RAG
+        try:
+            from behemot_framework.rag.rag_manager import RAGManager
+            RAGManager.reset_pipelines()
+            logger.info("🔄 Cache de pipelines RAG reseteado")
+        except Exception as e:
+            logger.warning(f"⚠️ Error reseteando pipelines RAG: {e}")
     
     # Ingerir documentos
     results = await ingest_all_folders(folders, config)
