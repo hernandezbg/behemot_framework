@@ -180,10 +180,59 @@ async def _ingest_from_gcp(folder: str, config: Dict[str, Any]) -> bool:
         collection_name = folder.replace("/", "_").replace("\\", "_")
         rag_pipeline = RAGManager.get_pipeline(collection_name)
         
-        # [Aquí iría todo el código GCP original]
-        # Por simplicidad, retorno False por ahora
-        logger.error("Ingesta GCP no implementada en esta versión simplificada")
-        return False
+        # Implementar lógica GCP completa
+        from google.cloud import storage
+        from google.oauth2 import service_account
+        
+        # Obtener cliente de storage
+        storage_client = _get_gcp_storage_client()
+        
+        # Obtener bucket y archivos
+        bucket_name = config.get("GCP_BUCKET_NAME")
+        if not bucket_name:
+            logger.error("No se especificó GCP_BUCKET_NAME en la configuración")
+            return False
+            
+        # Asegurar que folder termina con '/'
+        if folder and not folder.endswith('/'):
+            folder += '/'
+            
+        logger.info(f"🔍 Buscando archivos en bucket {bucket_name}, carpeta '{folder}'")
+        
+        bucket = storage_client.bucket(bucket_name)
+        if not bucket.exists():
+            logger.error(f"❌ El bucket {bucket_name} no existe o no tienes acceso")
+            return False
+            
+        blobs = list(bucket.list_blobs(prefix=folder))
+        files = [blob.name for blob in blobs if not blob.name.endswith('/')]
+        
+        if not files:
+            logger.info(f"⚠️ No hay documentos en la carpeta '{folder}'.")
+            return False
+            
+        logger.info(f"📄 Encontrados {len(files)} archivos en '{folder}'")
+        
+        # Preparar rutas GCP para cada archivo
+        gcp_paths = [f"gcp://{bucket_name}/{file}" for file in files]
+        
+        # Obtener configuración de chunks
+        chunk_size = config.get("RAG_CHUNK_SIZE", 1000)
+        chunk_overlap = config.get("RAG_CHUNK_OVERLAP", 200)
+        splitter_type = config.get("RAG_SPLITTER_TYPE", "recursive")
+        
+        # Ingerir documentos usando el pipeline
+        logger.info(f"📥 Ingiriendo {len(files)} documentos de '{folder}'...")
+        
+        await rag_pipeline.aingest_documents(
+            sources=gcp_paths,
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            splitter_type=splitter_type
+        )
+        
+        logger.info(f"✅ Documentos de '{folder}' ingresados correctamente.")
+        return True
         
     except Exception as e:
         logger.error(f"Error en ingesta GCP: {e}")
@@ -250,6 +299,38 @@ def check_gcp_credentials():
         logger.error(f"Private key presente: {private_key is not None}")
         logger.error(f"Client email presente: {client_email is not None}")
         return False
+
+
+def _get_gcp_storage_client():
+    """Obtiene el cliente de Google Cloud Storage con manejo de credenciales."""
+    from google.cloud import storage
+    from google.oauth2 import service_account
+    
+    # Intentar usando variables GS_* primero (como en DocumentLoader)
+    if os.environ.get("GS_PROJECT_ID") and os.environ.get("GS_PRIVATE_KEY"):
+        credentials_dict = {
+            "type": os.environ.get("GS_ACCOUNT_TYPE", "service_account"),
+            "project_id": os.environ.get("GS_PROJECT_ID"),
+            "private_key_id": os.environ.get("GS_PRIVATE_KEY_ID", ""),
+            "private_key": os.environ.get("GS_PRIVATE_KEY").replace("\\n", "\n"),
+            "client_email": os.environ.get("GS_CLIENT_EMAIL", ""),
+            "client_id": os.environ.get("GS_CLIENT_ID", ""),
+            "auth_uri": os.environ.get("GS_AUTH_URI", "https://accounts.google.com/o/oauth2/auth"),
+            "token_uri": os.environ.get("GS_TOKEN_URI", "https://oauth2.googleapis.com/token"),
+            "auth_provider_x509_cert_url": os.environ.get("GS_AUTH_PROVIDER_CERT_URL", 
+                                            "https://www.googleapis.com/oauth2/v1/certs"),
+            "client_x509_cert_url": os.environ.get("GS_CLIENT_CERT_URL", "")
+        }
+        credentials = service_account.Credentials.from_service_account_info(credentials_dict)
+        return storage.Client(credentials=credentials, project=credentials_dict["project_id"])
+    
+    # Fallback a archivo JSON si existe
+    credentials_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+    if credentials_path and os.path.exists(credentials_path):
+        return storage.Client.from_service_account_json(credentials_path)
+    
+    # Último recurso: ADC
+    return storage.Client()
     
 
 async def initialize_rag(config):
