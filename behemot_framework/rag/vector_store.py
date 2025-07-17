@@ -6,6 +6,11 @@ Módulo para gestionar bases de datos vectoriales con Chroma
 from typing import List, Dict, Any, Optional, Union
 import logging
 import os
+import time
+import hashlib
+import fcntl
+import tempfile
+from pathlib import Path
 
 from langchain.docstore.document import Document
 from langchain.schema.embeddings import Embeddings
@@ -33,26 +38,61 @@ logger = logging.getLogger(__name__)
 
 
 class ChromaClientManager:
-    """Singleton para gestionar clientes ChromaDB y evitar conflictos"""
+    """Manager para gestionar clientes ChromaDB y evitar conflictos entre procesos"""
     
     _clients = {}  # Cache de clientes por configuración
     
     @classmethod
     def get_client(cls, persist_directory: str = None, client_settings: Optional[Any] = None):
-        """Obtiene o crea un cliente ChromaDB reutilizable"""
+        """Obtiene o crea un cliente ChromaDB reutilizable con protección multiproceso"""
         import chromadb
         from chromadb.config import Settings
         
         # Crear clave única para el cliente
         key = f"{persist_directory}_{hash(str(client_settings))}"
         
-        if key not in cls._clients:
-            logger.info(f"Creando nuevo cliente ChromaDB para: {persist_directory}")
+        # Verificar si ya tenemos el cliente en memoria
+        if key in cls._clients:
+            return cls._clients[key]
+        
+        # File lock para evitar conflictos entre procesos worker
+        lock_file_path = None
+        lock_file = None
+        
+        try:
+            if persist_directory:
+                # Usar file locking para persistencia
+                lock_file_path = Path(tempfile.gettempdir()) / f"chroma_lock_{hashlib.md5(persist_directory.encode()).hexdigest()}.lock"
+                lock_file = open(lock_file_path, 'w')
+                
+                # Intentar obtener el lock con timeout
+                timeout = 30  # 30 segundos timeout
+                start_time = time.time()
+                while True:
+                    try:
+                        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        break
+                    except IOError:
+                        if time.time() - start_time > timeout:
+                            logger.error(f"❌ Timeout obteniendo lock para ChromaDB: {persist_directory}")
+                            raise TimeoutError(f"No se pudo obtener lock para ChromaDB después de {timeout}s")
+                        time.sleep(0.1)
+                        
+                logger.info(f"🔒 Lock obtenido para ChromaDB: {persist_directory}")
+            
+            logger.info(f"📦 Creando nuevo cliente ChromaDB para: {persist_directory}")
             
             if client_settings is None:
-                client_settings = Settings(anonymized_telemetry=False)
+                client_settings = Settings(
+                    anonymized_telemetry=False,
+                    allow_reset=True,  # Permitir reset en caso de conflictos
+                    is_persistent=bool(persist_directory)
+                )
             
             if persist_directory:
+                # Asegurar que el directorio existe
+                os.makedirs(persist_directory, exist_ok=True)
+                
                 client = chromadb.PersistentClient(
                     path=persist_directory,
                     settings=client_settings
@@ -61,12 +101,27 @@ class ChromaClientManager:
                 client = chromadb.Client(settings=client_settings)
             
             cls._clients[key] = client
+            logger.info(f"✅ Cliente ChromaDB creado exitosamente")
             
-        return cls._clients[key]
+            return client
+            
+        except Exception as e:
+            logger.error(f"❌ Error creando cliente ChromaDB: {e}")
+            raise
+        finally:
+            # Liberar el lock
+            if lock_file:
+                try:
+                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+                    lock_file.close()
+                    logger.info(f"🔓 Lock liberado para ChromaDB")
+                except Exception as e:
+                    logger.warning(f"⚠️ Error liberando lock: {e}")
     
     @classmethod
     def reset_clients(cls):
         """Reinicia todos los clientes (útil para testing)"""
+        logger.info("🔄 Reiniciando cache de clientes ChromaDB")
         cls._clients = {}
 
 
