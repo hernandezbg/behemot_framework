@@ -126,63 +126,92 @@ class RAGPipeline:
         
         # Cargar documentos
         all_documents = []
+        load_errors = []
         for source in sources:
             try:
                 docs = DocumentLoader.load_document(source)
-                all_documents.extend(docs)
-                logger.info(f"Cargados {len(docs)} documentos desde {source}")
+                if docs:
+                    all_documents.extend(docs)
+                    logger.info(f"✅ Cargados {len(docs)} documentos desde {source}")
+                else:
+                    load_errors.append(f"No se encontraron documentos en {source}")
+                    logger.warning(f"⚠️ No se encontraron documentos en {source}")
             except Exception as e:
-                logger.error(f"Error al cargar {source}: {e}")
+                load_errors.append(f"Error al cargar {source}: {e}")
+                logger.error(f"❌ Error al cargar {source}: {e}")
         
         if not all_documents:
-            logger.warning("No se pudieron cargar documentos")
-            if self.vectorstore:
-                return self.vectorstore
-            else:
-                # Crear un vectorstore vacío
-                return Chroma(
-                    persist_directory=self.persist_directory,
-                    embedding_function=self.embeddings,
-                    collection_name=self.collection_name,
-                )
+            error_msg = f"No se pudieron cargar documentos. Errores: {'; '.join(load_errors)}"
+            logger.error(f"❌ {error_msg}")
+            # En lugar de crear un vectorstore vacío, lanzar excepción
+            raise ValueError(error_msg)
         
         # Procesar y dividir documentos
-        chunks = DocumentProcessor.process_documents(
-            all_documents,
-            splitter_type=splitter_type,
-            chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap,
-        )
-        
-        logger.info(f"Documentos procesados en {len(chunks)} chunks")
+        try:
+            chunks = DocumentProcessor.process_documents(
+                all_documents,
+                splitter_type=splitter_type,
+                chunk_size=chunk_size,
+                chunk_overlap=chunk_overlap,
+            )
+            
+            if not chunks:
+                error_msg = f"El procesamiento de documentos no generó chunks. Verificar contenido de archivos y configuración de splitter."
+                logger.error(f"❌ {error_msg}")
+                raise ValueError(error_msg)
+                
+            logger.info(f"✅ Documentos procesados en {len(chunks)} chunks")
+            
+        except Exception as e:
+            error_msg = f"Error en el procesamiento de documentos: {e}"
+            logger.error(f"❌ {error_msg}")
+            raise ValueError(error_msg)
         
         # Crear o actualizar vectorstore según el tipo
-        if self.storage_type == "redis":
+        try:
+            if self.storage_type == "redis":
+                if self.vectorstore is None:
+                    self.vectorstore = VectorStoreManager.create_redis_index(
+                        chunks, 
+                        self.embeddings, 
+                        self.redis_url,
+                        self.collection_name
+                    )
+                    logger.info(f"✅ Índice Redis creado con {len(chunks)} chunks")
+                else:
+                    self.vectorstore = VectorStoreManager.add_documents_to_redis(
+                        self.vectorstore, chunks
+                    )
+                    logger.info(f"✅ Agregados {len(chunks)} chunks al índice Redis existente")
+            else:  # chroma (default)
+                if self.vectorstore is None:
+                    self.vectorstore = VectorStoreManager.create_chroma_index(
+                        chunks, 
+                        self.embeddings, 
+                        self.persist_directory,
+                        self.collection_name,
+                        self.client_settings
+                    )
+                    logger.info(f"✅ Índice Chroma creado con {len(chunks)} chunks")
+                else:
+                    self.vectorstore = VectorStoreManager.add_documents(
+                        self.vectorstore, chunks
+                    )
+                    logger.info(f"✅ Agregados {len(chunks)} chunks al índice Chroma existente")
+            
+            # Validar que el vectorstore se creó correctamente
             if self.vectorstore is None:
-                self.vectorstore = VectorStoreManager.create_redis_index(
-                    chunks, 
-                    self.embeddings, 
-                    self.redis_url,
-                    self.collection_name
-                )
-            else:
-                self.vectorstore = VectorStoreManager.add_documents_to_redis(
-                    self.vectorstore, chunks
-                )
-        else:  # chroma (default)
-            if self.vectorstore is None:
-                self.vectorstore = VectorStoreManager.create_chroma_index(
-                    chunks, 
-                    self.embeddings, 
-                    self.persist_directory,
-                    self.collection_name
-                )
-            else:
-                self.vectorstore = VectorStoreManager.add_documents(
-                    self.vectorstore, chunks
-                )
-        
-        return self.vectorstore
+                error_msg = "El vectorstore no se pudo crear correctamente"
+                logger.error(f"❌ {error_msg}")
+                raise ValueError(error_msg)
+                
+            logger.info(f"🎯 Ingestión completada exitosamente")
+            return self.vectorstore
+            
+        except Exception as e:
+            error_msg = f"Error al crear/actualizar vectorstore: {e}"
+            logger.error(f"❌ {error_msg}")
+            raise ValueError(error_msg)
     
     async def aingest_documents(
         self,

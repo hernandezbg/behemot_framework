@@ -131,22 +131,37 @@ async def _ingest_from_local(folder: str, config: Dict[str, Any]) -> bool:
             # Usar rutas absolutas directamente (sin prefijo file://)
             local_paths = [os.path.abspath(file_path) for file_path in files]
             
-            # Ingerir documentos
-            await rag_pipeline.aingest_documents(
+            # Ingerir documentos y obtener el vectorstore resultante
+            vectorstore = await rag_pipeline.aingest_documents(
                 sources=local_paths,
                 chunk_size=config.get("RAG_CHUNK_SIZE", 1000),
                 chunk_overlap=config.get("RAG_CHUNK_OVERLAP", 200),
                 splitter_type=config.get("RAG_SPLITTER_TYPE", "recursive")
             )
             
-            processed_count = len(files)
-            logger.info(f"✅ Procesados {processed_count} archivos exitosamente")
+            # Verificar si realmente se indexaron documentos
+            if vectorstore and hasattr(vectorstore, '_collection'):
+                # Obtener el conteo real de documentos en el vectorstore
+                try:
+                    doc_count = vectorstore._collection.count()
+                    if doc_count > 0:
+                        processed_count = len(files)  # Archivos procesados exitosamente
+                        logger.info(f"✅ Indexados {doc_count} chunks de {processed_count} archivos")
+                    else:
+                        processed_count = 0
+                        logger.error(f"❌ Vectorstore creado pero sin documentos indexados")
+                except Exception as count_error:
+                    logger.warning(f"⚠️ No se pudo verificar conteo de documentos: {count_error}")
+                    processed_count = 0
+            else:
+                processed_count = 0
+                logger.error(f"❌ No se pudo crear el vectorstore")
             
         except Exception as e:
             logger.error(f"❌ Error en pipeline RAG: {e}")
             processed_count = 0
         
-        logger.info(f"✅ Procesados {processed_count}/{len(files)} archivos exitosamente")
+        logger.info(f"📊 Resultado final: {processed_count}/{len(files)} archivos procesados exitosamente")
         return processed_count > 0
         
     except Exception as e:

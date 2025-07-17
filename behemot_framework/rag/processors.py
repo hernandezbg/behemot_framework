@@ -74,29 +74,29 @@ class DocumentProcessor:
         return text_splitter.split_documents(documents)
 
     @staticmethod
-    def split_documents_recursive(
+    def split_documents_by_character(
         documents: List[Document],
         chunk_size: int = 1000,
         chunk_overlap: int = 200,
-        separators: Optional[List[str]] = None,
+        separator: str = "\n",
     ) -> List[Document]:
         """
-        Divide documentos usando separadores recursivos
+        Divide documentos usando un separador específico
         
         Args:
             documents: Lista de documentos a dividir
             chunk_size: Tamaño máximo de cada chunk en caracteres
             chunk_overlap: Superposición entre chunks en caracteres
-            separators: Lista de separadores a usar (por defecto: ["\n\n", "\n", " ", ""])
+            separator: Separador a usar para dividir el texto
             
         Returns:
             Lista de documentos divididos
         """
-        logger.info(f"Dividiendo {len(documents)} documentos recursivamente")
-        text_splitter = RecursiveCharacterTextSplitter(
+        logger.info(f"Dividiendo {len(documents)} documentos por caracter con separador: '{separator}'")
+        text_splitter = CharacterTextSplitter(
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
-            separators=separators or ["\n\n", "\n", " ", ""],
+            separator=separator,
         )
         return text_splitter.split_documents(documents)
 
@@ -129,8 +129,9 @@ class DocumentProcessor:
                 documents, chunk_size, chunk_overlap, separators
             )
         elif splitter_type == "character":
+            separator = kwargs.get("separator", "\n")
             return cls.split_documents_by_character(
-                documents, chunk_size, chunk_overlap, **kwargs.get("separator", "\n")
+                documents, chunk_size, chunk_overlap, separator
             )
         else:
             logger.warning(f"Tipo de divisor desconocido: {splitter_type}, usando recursive")
