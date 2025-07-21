@@ -59,7 +59,7 @@ class Assistant:
         else:
             logger.info("🚫 MORPHING deshabilitado")
 
-    async def generar_respuesta(self, chat_id: str, mensaje_usuario: str) -> str:
+    async def generar_respuesta(self, chat_id: str, mensaje_usuario: str, imagen_path: str = None) -> str:
 
         # Verificar si es un comando especial
         if mensaje_usuario.strip().startswith("&"):
@@ -83,7 +83,22 @@ class Assistant:
         # Inyectar fecha actual en el mensaje del sistema
         conversation = DateMiddleware.inject_current_date(conversation)
 
-        conversation.append({"role": "user", "content": mensaje_usuario})
+        # Manejar imágenes - Almacenar la ruta de la imagen para usarla más adelante
+        self._current_image_path = imagen_path if imagen_path else None
+        
+        # Preparar el mensaje del usuario
+        user_message_content = mensaje_usuario
+        if imagen_path:
+            if hasattr(self.modelo, 'soporta_vision') and self.modelo.soporta_vision():
+                # Si el modelo soporta visión, agregar contexto sobre la imagen
+                user_message_content = f"{mensaje_usuario}\n[Imagen adjunta para análisis]"
+                logger.info(f"🖼️ Procesando mensaje con imagen: {imagen_path}")
+            else:
+                # Si el modelo no soporta visión, informar al usuario
+                user_message_content = f"{mensaje_usuario}\n\n[Nota: Recibí una imagen pero este modelo no puede procesarla. Solo puedo responder al texto.]"
+                logger.warning(f"⚠️ Modelo {type(self.modelo).__name__} no soporta visión. Imagen ignorada: {imagen_path}")
+        
+        conversation.append({"role": "user", "content": user_message_content})
         
         # MORPHING: Verificar si necesito cambiar de personalidad/configuración
         morph_result = self.morphing_manager.process_message(mensaje_usuario, conversation)
@@ -253,10 +268,40 @@ class Assistant:
         # Debug: Mostrar herramientas disponibles
         logger.info(f"🔧 Herramientas disponibles para el assistant: {[f['name'] for f in functions]}")
 
-        try:
-            response = self.modelo.generar_respuesta_con_functions(conversation, functions)
-        except Exception as e:
-            return f"Error al generar respuesta: {str(e)}"
+        # Decidir qué método usar basado en si hay imagen y si el modelo soporta visión
+        if (self._current_image_path and 
+            hasattr(self.modelo, 'soporta_vision') and 
+            self.modelo.soporta_vision() and
+            not functions):  # Sin herramientas, usar respuesta simple con visión
+            try:
+                # Para mensajes con imagen sin herramientas, usar el método directo
+                response_text = self.modelo.generar_respuesta(
+                    mensaje_usuario, 
+                    self.prompt_sistema, 
+                    self._current_image_path
+                )
+                
+                # Aplicar filtro si está disponible
+                if self.safety_filter:
+                    safety_result = await self.safety_filter.filter_content(response_text)
+                    if not safety_result["is_safe"]:
+                        logger.warning(f"Respuesta filtrada - Chat {chat_id}: {safety_result['reason']}")
+                        response_text = safety_result["filtered_content"]
+                
+                # Agregar a la conversación y guardar
+                conversation.append({"role": "assistant", "content": response_text})
+                save_conversation(chat_id, conversation)
+                
+                return response_text
+                
+            except Exception as e:
+                return f"Error al generar respuesta con imagen: {str(e)}"
+        else:
+            # Usar el método con herramientas (comportamiento actual)
+            try:
+                response = self.modelo.generar_respuesta_con_functions(conversation, functions)
+            except Exception as e:
+                return f"Error al generar respuesta: {str(e)}"
 
         choice = response.choices[0]
         

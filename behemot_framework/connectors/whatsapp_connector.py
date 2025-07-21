@@ -69,6 +69,19 @@ class WhatsAppConnector:
                     audio_path = self.descargar_archivo_media(audio_id)
                     return sender, {"type": "voice", "content": audio_path}
                     
+            elif message_type == "image":
+                # Mensaje con imagen
+                image_id = message.get("image", {}).get("id", "")
+                caption = message.get("image", {}).get("caption", "")
+                if image_id:
+                    image_path = self.descargar_archivo_media(image_id, "image")
+                    if image_path:
+                        return sender, {
+                            "type": "image", 
+                            "content": image_path,
+                            "caption": caption
+                        }
+                    
             # No procesamos otros tipos por ahora
             return sender, None
             
@@ -76,12 +89,13 @@ class WhatsAppConnector:
             logger.error(f"Error al extraer mensaje de WhatsApp: {str(e)}")
             return None, None
 
-    def descargar_archivo_media(self, media_id: str) -> Optional[str]:
+    def descargar_archivo_media(self, media_id: str, media_type: str = "audio") -> Optional[str]:
         """
         Descarga un archivo de medios (audio, imagen, etc.) desde WhatsApp.
         
         Args:
             media_id: ID del archivo multimedia
+            media_type: Tipo de media ("audio", "image", etc.)
             
         Returns:
             Ruta local al archivo descargado o None si hay error
@@ -116,9 +130,18 @@ class WhatsAppConnector:
                 logger.error(f"Error al descargar media: {download_response.text}")
                 return None
                 
-            # 3. Guardar en archivo temporal
+            # 3. Determinar extensión según el tipo de media
+            if media_type == "image":
+                # WhatsApp típicamente envía imágenes como JPEG
+                extension = ".jpg"
+            elif media_type == "audio":
+                extension = ".ogg"
+            else:
+                extension = ".bin"
+            
+            # 4. Guardar en archivo temporal
             temp_dir = tempfile.gettempdir()
-            local_path = os.path.join(temp_dir, f"whatsapp_media_{media_id}.ogg")
+            local_path = os.path.join(temp_dir, f"whatsapp_media_{media_id}{extension}")
             
             with open(local_path, 'wb') as f:
                 for chunk in download_response.iter_content(chunk_size=8192):
