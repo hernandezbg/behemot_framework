@@ -271,8 +271,7 @@ class Assistant:
         # Decidir qué método usar basado en si hay imagen y si el modelo soporta visión
         if (self._current_image_path and 
             hasattr(self.modelo, 'soporta_vision') and 
-            self.modelo.soporta_vision() and
-            not functions):  # Sin herramientas, usar respuesta simple con visión
+            self.modelo.soporta_vision()):  # Si hay imagen y el modelo soporta visión, usar método directo
             try:
                 # Para mensajes con imagen sin herramientas, usar el método directo
                 response_text = self.modelo.generar_respuesta(
