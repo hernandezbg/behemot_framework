@@ -268,10 +268,22 @@ class Assistant:
         # Debug: Mostrar herramientas disponibles
         logger.info(f"🔧 Herramientas disponibles para el assistant: {[f['name'] for f in functions]}")
 
+        # Debug: Verificar condiciones para procesamiento de imagen
+        has_image = self._current_image_path is not None
+        has_vision_method = hasattr(self.modelo, 'soporta_vision')
+        supports_vision = has_vision_method and self.modelo.soporta_vision() if has_vision_method else False
+        
+        logger.info(f"🔍 Debug procesamiento imagen: has_image={has_image}, has_vision_method={has_vision_method}, supports_vision={supports_vision}")
+        if has_image:
+            logger.info(f"📷 Ruta imagen: {self._current_image_path}")
+            logger.info(f"🤖 Tipo de modelo: {type(self.modelo).__name__}")
+
         # Decidir qué método usar basado en si hay imagen y si el modelo soporta visión
         if (self._current_image_path and 
             hasattr(self.modelo, 'soporta_vision') and 
             self.modelo.soporta_vision()):  # Si hay imagen y el modelo soporta visión, usar método directo
+            
+            logger.info(f"🖼️ USANDO FLUJO DIRECTO PARA IMAGEN: {self._current_image_path}")
             try:
                 # Para mensajes con imagen sin herramientas, usar el método directo
                 response_text = self.modelo.generar_respuesta(
