@@ -1,5 +1,7 @@
 # app/models/gpt_model.py
 import logging
+import base64
+from typing import Optional
 from openai import OpenAI
 from .base_model import BaseModel
 from behemot_framework.config import load_config
@@ -21,6 +23,62 @@ class GPTModel(BaseModel):
         
         logger.info("Configuración del modelo cargada: modelo=%s, temperature=%s, max_tokens=%s", 
                     self.model_name, self.temperature, self.max_tokens)
+    
+    def soporta_vision(self) -> bool:
+        """
+        GPT-4o y GPT-4-vision-preview soportan procesamiento de imágenes.
+        """
+        vision_models = ["gpt-4o", "gpt-4o-mini", "gpt-4-vision-preview", "gpt-4-turbo"]
+        return any(model in self.model_name for model in vision_models)
+    
+    def _encode_image(self, image_path: str) -> str:
+        """
+        Codifica una imagen en base64 para enviarla a OpenAI.
+        
+        Args:
+            image_path: Ruta al archivo de imagen
+            
+        Returns:
+            Imagen codificada en base64
+        """
+        with open(image_path, "rb") as image_file:
+            return base64.b64encode(image_file.read()).decode('utf-8')
+    
+    def _create_image_message(self, text: str, image_path: Optional[str] = None) -> dict:
+        """
+        Crea un mensaje que puede incluir texto e imagen.
+        
+        Args:
+            text: Texto del mensaje
+            image_path: Ruta opcional a la imagen
+            
+        Returns:
+            Mensaje formateado para OpenAI
+        """
+        if image_path and self.soporta_vision():
+            try:
+                base64_image = self._encode_image(image_path)
+                return {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": text
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{base64_image}"
+                            }
+                        }
+                    ]
+                }
+            except Exception as e:
+                logger.error(f"Error procesando imagen {image_path}: {e}")
+                # Si falla la imagen, enviar solo texto
+                return {"role": "user", "content": text}
+        else:
+            return {"role": "user", "content": text}
 
     def generar_respuesta_con_functions(self, conversation: list, functions: list) -> any:
         try:
@@ -52,10 +110,10 @@ class GPTModel(BaseModel):
         except Exception as e:
             return f"Error en la API de OpenAI: {str(e)}"
 
-    def generar_respuesta(self, mensaje_usuario: str, prompt_sistema: str) -> str:
+    def generar_respuesta(self, mensaje_usuario: str, prompt_sistema: str, imagen_path: Optional[str] = None) -> str:
         messages = [
             {"role": "system", "content": prompt_sistema},
-            {"role": "user", "content": mensaje_usuario}
+            self._create_image_message(mensaje_usuario, imagen_path)
         ]
         try:
             response = self.client.chat.completions.create(

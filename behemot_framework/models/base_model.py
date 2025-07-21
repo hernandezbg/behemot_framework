@@ -1,6 +1,6 @@
 # models/base_model.py
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional, Union
 
 
 class BaseModel(ABC):
@@ -20,13 +20,14 @@ class BaseModel(ABC):
         pass
     
     @abstractmethod
-    def generar_respuesta(self, mensaje_usuario: str, prompt_sistema: str) -> str:
+    def generar_respuesta(self, mensaje_usuario: str, prompt_sistema: str, imagen_path: Optional[str] = None) -> str:
         """
         Genera una respuesta simple sin contexto de conversación.
         
         Args:
             mensaje_usuario: El mensaje del usuario
             prompt_sistema: El prompt del sistema que define el comportamiento
+            imagen_path: Ruta opcional a una imagen para procesamiento multimodal
             
         Returns:
             La respuesta generada como string
@@ -59,5 +60,37 @@ class BaseModel(ABC):
             La respuesta generada como string
         """
         pass
+    
+    def soporta_vision(self) -> bool:
+        """
+        Indica si este modelo soporta procesamiento de imágenes.
+        Por defecto retorna False, los modelos con visión deben sobrescribir.
+        
+        Returns:
+            True si soporta visión, False en caso contrario
+        """
+        return False
+    
+    def generar_respuesta_multimodal(self, mensaje_usuario: str, imagen_path: str, prompt_sistema: str) -> str:
+        """
+        Genera una respuesta usando tanto texto como imagen.
+        Método opcional que pueden implementar modelos con capacidades de visión.
+        
+        Args:
+            mensaje_usuario: El mensaje de texto del usuario
+            imagen_path: Ruta al archivo de imagen
+            prompt_sistema: El prompt del sistema
+            
+        Returns:
+            La respuesta generada como string
+            
+        Raises:
+            NotImplementedError: Si el modelo no soporta visión
+        """
+        if not self.soporta_vision():
+            raise NotImplementedError(f"El modelo {self.__class__.__name__} no soporta procesamiento de imágenes")
+        
+        # Por defecto, delegar al método generar_respuesta con imagen_path
+        return self.generar_respuesta(mensaje_usuario, prompt_sistema, imagen_path)
 
 

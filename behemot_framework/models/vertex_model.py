@@ -2,6 +2,7 @@
 import logging
 import json
 from typing import List, Dict, Any, Optional
+from PIL import Image
 from .base_model import BaseModel
 from behemot_framework.config import Config
 
@@ -63,13 +64,46 @@ class VertexModel(BaseModel):
             logger.error(f"Error inicializando Vertex AI: {e}")
             raise
     
-    def generar_respuesta(self, mensaje_usuario: str, prompt_sistema: str) -> str:
+    def soporta_vision(self) -> bool:
+        """
+        Vertex AI con Gemini 1.5 soporta procesamiento de imágenes nativamente.
+        """
+        vision_models = ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-pro-vision"]
+        return any(model in self.model_name for model in vision_models)
+    
+    def _create_content_with_image(self, texto: str, imagen_path: Optional[str] = None) -> list:
+        """
+        Crea contenido que puede incluir texto e imagen para Vertex AI.
+        
+        Args:
+            texto: Texto del mensaje
+            imagen_path: Ruta opcional a la imagen
+            
+        Returns:
+            Lista de contenido para Vertex AI
+        """
+        content_parts = [texto]
+        
+        if imagen_path and self.soporta_vision():
+            try:
+                # Cargar imagen usando PIL
+                img = Image.open(imagen_path)
+                content_parts.append(img)
+                logger.info(f"Imagen agregada al contenido de Vertex AI: {imagen_path}")
+            except Exception as e:
+                logger.error(f"Error cargando imagen {imagen_path}: {e}")
+                # Si falla la imagen, continuar solo con texto
+        
+        return content_parts
+    
+    def generar_respuesta(self, mensaje_usuario: str, prompt_sistema: str, imagen_path: Optional[str] = None) -> str:
         """
         Genera una respuesta simple sin contexto de conversación.
         
         Args:
             mensaje_usuario: El mensaje del usuario
             prompt_sistema: El prompt del sistema que define el comportamiento
+            imagen_path: Ruta opcional a una imagen para procesamiento multimodal
             
         Returns:
             La respuesta generada como string
@@ -78,7 +112,10 @@ class VertexModel(BaseModel):
             # Combinar prompt del sistema con el mensaje del usuario
             prompt_completo = f"{prompt_sistema}\n\nUsuario: {mensaje_usuario}\nAsistente:"
             
-            response = self.model.generate_content(prompt_completo)
+            # Crear contenido que puede incluir imagen
+            content_parts = self._create_content_with_image(prompt_completo, imagen_path)
+            
+            response = self.model.generate_content(content_parts)
             return response.text.strip()
             
         except Exception as e:

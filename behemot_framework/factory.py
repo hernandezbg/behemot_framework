@@ -176,6 +176,9 @@ class BehemotFactory:
             # Indicar que el bot está "escribiendo"
             self.telegram_connector.enviar_accion(chat_id, "typing")
             
+            texto = None
+            imagen_path = None
+            
             if mensaje["type"] == "text":
                 texto = mensaje["content"]
             elif mensaje["type"] == "voice" and self.transcriptor:
@@ -189,12 +192,18 @@ class BehemotFactory:
                     os.remove(audio_path)
                 except:
                     pass
+            elif mensaje["type"] == "image":
+                # Manejar mensaje con imagen
+                imagen_path = mensaje["content"]
+                caption = mensaje.get("caption", "")
+                texto = caption if caption else "¿Qué puedes decirme sobre esta imagen?"
+                logging.info(f"Imagen recibida del chat {chat_id}: {imagen_path}, caption: '{caption}'")
             else:
                 return {"status": "ok"}
             
             if texto:
                 self.telegram_connector.enviar_accion(chat_id, "typing")
-                respuesta = await self.asistente.generar_respuesta(str(chat_id), texto)
+                respuesta = await self.asistente.generar_respuesta(str(chat_id), texto, imagen_path)
                 # Verificar si el conector tiene método procesar_respuesta
                 if hasattr(self.telegram_connector, 'procesar_respuesta'):
                     await self.telegram_connector.procesar_respuesta(chat_id, respuesta)
@@ -465,6 +474,9 @@ class BehemotFactory:
                 
                 logger.info(f"Mensaje recibido de {phone_number}: tipo={mensaje['type']}")
                 
+                texto = None
+                imagen_path = None
+                
                 if mensaje["type"] == "text":
                     texto = mensaje["content"]
                     logger.info(f"Mensaje de texto: {texto[:50]}...")
@@ -481,6 +493,12 @@ class BehemotFactory:
                         logger.debug(f"Archivo temporal eliminado: {audio_path}")
                     except Exception as e:
                         logger.warning(f"No se pudo eliminar archivo temporal: {e}")
+                elif mensaje["type"] == "image":
+                    # Manejar mensaje con imagen
+                    imagen_path = mensaje["content"]
+                    caption = mensaje.get("caption", "")
+                    texto = caption if caption else "¿Qué puedes decirme sobre esta imagen?"
+                    logger.info(f"Imagen recibida de {phone_number}: {imagen_path}, caption: '{caption}'")
                 else:
                     logger.debug(f"Tipo de mensaje no soportado: {mensaje['type']}")
                     return {"status": "ok"}
@@ -488,7 +506,7 @@ class BehemotFactory:
                 if texto:
                     # Generar respuesta del asistente
                     logger.info(f"Generando respuesta para {phone_number}")
-                    respuesta = await self.asistente.generar_respuesta(str(phone_number), texto)
+                    respuesta = await self.asistente.generar_respuesta(str(phone_number), texto, imagen_path)
                     
                     # Enviar respuesta
                     logger.info(f"Enviando respuesta a {phone_number}")
