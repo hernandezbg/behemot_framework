@@ -8,9 +8,15 @@ import logging
 import os
 import time
 import hashlib
-import fcntl
 import tempfile
 from pathlib import Path
+import platform
+
+# Importar fcntl solo en sistemas Unix/Linux
+if platform.system() != 'Windows':
+    import fcntl
+else:
+    fcntl = None
 
 from langchain.docstore.document import Document
 from langchain.schema.embeddings import Embeddings
@@ -61,24 +67,41 @@ class ChromaClientManager:
         
         try:
             if persist_directory:
-                # Usar file locking para persistencia
-                lock_file_path = Path(tempfile.gettempdir()) / f"chroma_lock_{hashlib.md5(persist_directory.encode()).hexdigest()}.lock"
-                lock_file = open(lock_file_path, 'w')
-                
-                # Intentar obtener el lock con timeout
-                timeout = 30  # 30 segundos timeout
-                start_time = time.time()
-                while True:
-                    try:
-                        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-                        break
-                    except IOError:
-                        if time.time() - start_time > timeout:
-                            logger.error(f"❌ Timeout obteniendo lock para ChromaDB: {persist_directory}")
-                            raise TimeoutError(f"No se pudo obtener lock para ChromaDB después de {timeout}s")
+                # Usar file locking para persistencia solo en sistemas Unix/Linux
+                if fcntl is not None:
+                    lock_file_path = Path(tempfile.gettempdir()) / f"chroma_lock_{hashlib.md5(persist_directory.encode()).hexdigest()}.lock"
+                    lock_file = open(lock_file_path, 'w')
+                    
+                    # Intentar obtener el lock con timeout
+                    timeout = 30  # 30 segundos timeout
+                    start_time = time.time()
+                    while True:
+                        try:
+                            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                            break
+                        except IOError:
+                            if time.time() - start_time > timeout:
+                                logger.error(f"❌ Timeout obteniendo lock para ChromaDB: {persist_directory}")
+                                raise TimeoutError(f"No se pudo obtener lock para ChromaDB después de {timeout}s")
+                            time.sleep(0.1)
+                            
+                    logger.info(f"🔒 Lock obtenido para ChromaDB: {persist_directory}")
+                else:
+                    # En Windows, usar un enfoque diferente con archivo de bloqueo
+                    lock_file_path = Path(persist_directory) / ".chroma_lock"
+                    max_attempts = 300  # 30 segundos con intentos cada 0.1s
+                    attempts = 0
+                    
+                    while lock_file_path.exists() and attempts < max_attempts:
                         time.sleep(0.1)
-                        
-                logger.info(f"🔒 Lock obtenido para ChromaDB: {persist_directory}")
+                        attempts += 1
+                    
+                    if attempts >= max_attempts:
+                        logger.warning(f"⚠️ Lock file existe después de timeout, continuando de todos modos: {lock_file_path}")
+                    
+                    # Crear archivo de bloqueo
+                    lock_file_path.touch()
+                    logger.info(f"🔒 Lock file creado para ChromaDB (Windows): {lock_file_path}")
             
             logger.info(f"📦 Creando nuevo cliente ChromaDB para: {persist_directory}")
             
@@ -111,9 +134,16 @@ class ChromaClientManager:
             # Liberar el lock
             if lock_file:
                 try:
-                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
-                    lock_file.close()
-                    logger.info(f"🔓 Lock liberado para ChromaDB")
+                    if fcntl is not None:
+                        fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+                        lock_file.close()
+                        logger.info(f"🔓 Lock liberado para ChromaDB")
+                    else:
+                        # En Windows, eliminar archivo de bloqueo
+                        lock_file.close()
+                        if lock_file_path and lock_file_path.exists():
+                            lock_file_path.unlink()
+                            logger.info(f"🔓 Lock file eliminado para ChromaDB (Windows): {lock_file_path}")
                 except Exception as e:
                     logger.warning(f"⚠️ Error liberando lock: {e}")
     
