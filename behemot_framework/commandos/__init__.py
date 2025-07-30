@@ -19,6 +19,9 @@ from behemot_framework.commandos.system_status import (
 import behemot_framework.commandos.system_monitor
 from . import session_analyzer
 
+# Importar comandos RAG
+from . import rag_commands
+
 # Importar comandos definidos
 from behemot_framework.commandos.command_handler import (
     clear_messages,
