@@ -129,20 +129,11 @@ async def reindex_rag_command(chat_id: str, collection: str = "default", sources
         
         for source in document_sources:
             if _is_gcs_url(source):
-                # Para URLs de GCS, intentar validar pero si falla, asumir que existe
-                # y dejar que DocumentLoader maneje el error
-                try:
-                    if _validate_source(source):
-                        valid_sources.append(source)
-                        logger.info(f"URL GCS validada exitosamente: {source}")
-                    else:
-                        logger.warning(f"No se pudo validar URL GCS, pero intentaremos procesarla: {source}")
-                        valid_sources.append(source)
-                        gcs_sources_skipped.append(source)
-                except Exception as e:
-                    logger.warning(f"Error validando GCS {source}, pero intentaremos procesarla: {e}")
-                    valid_sources.append(source)
-                    gcs_sources_skipped.append(source)
+                # Para URLs de GCS, saltamos la validación y asumimos que existen
+                # El DocumentLoader se encargará de manejar errores de acceso
+                logger.info(f"URL GCS detectada, saltando validación: {source}")
+                valid_sources.append(source)
+                gcs_sources_skipped.append(source)
             else:
                 # Para archivos locales, validar normalmente
                 if _validate_source(source):
