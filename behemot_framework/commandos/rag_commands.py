@@ -7,7 +7,72 @@ from behemot_framework.commandos.command_handler import command
 from behemot_framework.rag.rag_manager import RAGManager
 from behemot_framework.config import Config
 
+# Importar Google Cloud Storage solo si está disponible
+try:
+    from google.cloud import storage
+    GCS_AVAILABLE = True
+except ImportError:
+    GCS_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
+
+def _is_gcs_url(path: str) -> bool:
+    """Verifica si una ruta es una URL de Google Cloud Storage."""
+    return path.startswith("gs://")
+
+def _validate_gcs_url(gcs_url: str) -> bool:
+    """
+    Valida si una URL de GCS existe y es accesible.
+    
+    Args:
+        gcs_url: URL en formato gs://bucket/path
+        
+    Returns:
+        True si el archivo existe, False en caso contrario
+    """
+    if not GCS_AVAILABLE:
+        logger.warning("Google Cloud Storage no está disponible. Instale google-cloud-storage")
+        return False
+        
+    try:
+        # Parsear la URL GCS
+        if not gcs_url.startswith("gs://"):
+            return False
+            
+        path_parts = gcs_url[5:].split("/", 1)  # Remover "gs://"
+        if len(path_parts) != 2:
+            return False
+            
+        bucket_name, blob_path = path_parts
+        
+        # Crear cliente de GCS
+        client = storage.Client()
+        bucket = client.bucket(bucket_name)
+        blob = bucket.blob(blob_path)
+        
+        # Verificar si el blob existe
+        exists = blob.exists()
+        logger.debug(f"GCS URL {gcs_url}: {'existe' if exists else 'no existe'}")
+        return exists
+        
+    except Exception as e:
+        logger.error(f"Error validando URL GCS {gcs_url}: {e}")
+        return False
+
+def _validate_source(source: str) -> bool:
+    """
+    Valida si una fuente (local o GCS) existe y es accesible.
+    
+    Args:
+        source: Ruta local o URL de GCS
+        
+    Returns:
+        True si la fuente existe, False en caso contrario
+    """
+    if _is_gcs_url(source):
+        return _validate_gcs_url(source)
+    else:
+        return os.path.exists(source)
 
 @command(name="reindex_rag", description="Reindexar todos los documentos RAG de una colección")
 async def reindex_rag_command(chat_id: str, collection: str = "default", sources: str = None, **kwargs) -> str:
@@ -54,11 +119,11 @@ async def reindex_rag_command(chat_id: str, collection: str = "default", sources
             if not document_sources:
                 return "❌ **Error**: No se especificaron documentos para indexar. Use el parámetro 'sources' o configure RAG_DOCUMENT_SOURCES."
         
-        # Verificar que las fuentes existan
+        # Verificar que las fuentes existan (local o GCS)
         valid_sources = []
         invalid_sources = []
         for source in document_sources:
-            if os.path.exists(source):
+            if _validate_source(source):
                 valid_sources.append(source)
             else:
                 invalid_sources.append(source)
@@ -70,6 +135,15 @@ async def reindex_rag_command(chat_id: str, collection: str = "default", sources
         result = f"🔄 **Reindexación RAG iniciada**\n\n"
         result += f"📁 **Colección**: `{collection}`\n"
         result += f"📚 **Documentos a procesar**: {len(valid_sources)}\n"
+        
+        # Mostrar tipos de fuentes
+        local_sources = [s for s in valid_sources if not _is_gcs_url(s)]
+        gcs_sources = [s for s in valid_sources if _is_gcs_url(s)]
+        
+        if local_sources:
+            result += f"📂 **Archivos locales**: {len(local_sources)}\n"
+        if gcs_sources:
+            result += f"☁️ **Archivos GCS**: {len(gcs_sources)}\n"
         
         if invalid_sources:
             result += f"\n⚠️ **Fuentes no encontradas** ({len(invalid_sources)}):\n"

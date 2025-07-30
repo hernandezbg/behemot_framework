@@ -351,14 +351,18 @@ class DocumentLoader:
         if source.startswith(("http://", "https://")):
             return cls.load_url(source)
         
-        # Patrones especiales para GCP
-        elif source.startswith("gcp://"):
-            parts = source[6:].split('/', 1)
+        # Patrones especiales para GCP (soporta tanto gcp:// como gs://)
+        elif source.startswith(("gcp://", "gs://")):
+            if source.startswith("gcp://"):
+                parts = source[6:].split('/', 1)
+            else:  # gs://
+                parts = source[5:].split('/', 1)
+                
             if len(parts) != 2:
-                logger.error(f"Formato GCP inválido: {source}")
-                raise ValueError(f"Formato GCP inválido. Debe ser gcp://bucket/key: {source}")
+                logger.error(f"Formato GCS inválido: {source}")
+                raise ValueError(f"Formato GCS inválido. Debe ser gs://bucket/key o gcp://bucket/key: {source}")
             bucket, key = parts
-            logger.info(f"Parseo de ruta GCP: bucket={bucket}, key={key}")
+            logger.info(f"Parseo de ruta GCS: bucket={bucket}, key={key}")
             return cls.load_gcp_bucket(bucket, key)
         
         # Patrones especiales para S3
