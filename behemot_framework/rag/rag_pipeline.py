@@ -340,7 +340,7 @@ class RAGPipeline:
         docs = self.query_documents(query, k)
         return RAGRetriever.format_retrieved_documents(docs)
     
-    def delete_collection() -> None:
+    def delete_collection(self) -> None:
         """
         Elimina la colección actual
         """

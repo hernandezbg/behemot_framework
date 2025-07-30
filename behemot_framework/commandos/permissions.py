@@ -16,6 +16,7 @@ class PermissionManager:
         "broadcast": ["sendmsg", "list_users"],
         "user_management": ["delete_session", "list_sessions", "analyze_session"],
         "system": ["status", "monitor", "reset_to_fabric", "clear_msg"],
+        "rag": ["reindex_rag", "rag_status", "rag_search", "rag_collections"],
         "super_admin": ["*"]  # Acceso a todos los comandos
     }
     
@@ -104,7 +105,7 @@ class PermissionManager:
         """
         # En modo desarrollo, todos tienen todos los permisos
         if self.admin_mode == "dev":
-            return ["user_info", "broadcast", "user_management", "system", "super_admin"]
+            return ["user_info", "broadcast", "user_management", "system", "rag", "super_admin"]
         
         # Si no es admin, solo permisos básicos
         if not self.is_admin(user_id, platform):
@@ -197,7 +198,7 @@ class PermissionManager:
         
         # Información detallada de permisos
         permission_details = {}
-        for permission in ["user_info", "broadcast", "user_management", "system", "super_admin"]:
+        for permission in ["user_info", "broadcast", "user_management", "system", "rag", "super_admin"]:
             has_perm = permission in user_permissions
             commands = self.PERMISSION_GROUPS.get(permission, [])
             permission_details[permission] = {
@@ -229,6 +230,7 @@ class PermissionManager:
             "broadcast": "Puede enviar mensajes masivos",
             "user_management": "Puede gestionar usuarios y sesiones",
             "system": "Puede acceder a comandos de sistema",
+            "rag": "Puede gestionar el sistema RAG (reindexar, buscar)",
             "super_admin": "Acceso completo a todos los comandos"
         }
         return descriptions.get(permission, "Permiso desconocido")
