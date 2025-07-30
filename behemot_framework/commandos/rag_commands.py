@@ -37,13 +37,16 @@ def _validate_gcs_url(gcs_url: str) -> bool:
     try:
         # Parsear la URL GCS
         if not gcs_url.startswith("gs://"):
+            logger.error(f"URL no comienza con gs://: {gcs_url}")
             return False
             
         path_parts = gcs_url[5:].split("/", 1)  # Remover "gs://"
         if len(path_parts) != 2:
+            logger.error(f"Formato de URL GCS inválido: {gcs_url}")
             return False
             
         bucket_name, blob_path = path_parts
+        logger.info(f"Validando GCS: bucket='{bucket_name}', path='{blob_path}'")
         
         # Crear cliente de GCS
         client = storage.Client()
@@ -52,11 +55,11 @@ def _validate_gcs_url(gcs_url: str) -> bool:
         
         # Verificar si el blob existe
         exists = blob.exists()
-        logger.debug(f"GCS URL {gcs_url}: {'existe' if exists else 'no existe'}")
+        logger.info(f"GCS URL {gcs_url}: {'existe' if exists else 'no existe'}")
         return exists
         
     except Exception as e:
-        logger.error(f"Error validando URL GCS {gcs_url}: {e}")
+        logger.error(f"Error validando URL GCS {gcs_url}: {e}", exc_info=True)
         return False
 
 def _validate_source(source: str) -> bool:
@@ -122,11 +125,30 @@ async def reindex_rag_command(chat_id: str, collection: str = "default", sources
         # Verificar que las fuentes existan (local o GCS)
         valid_sources = []
         invalid_sources = []
+        gcs_sources_skipped = []
+        
         for source in document_sources:
-            if _validate_source(source):
-                valid_sources.append(source)
+            if _is_gcs_url(source):
+                # Para URLs de GCS, intentar validar pero si falla, asumir que existe
+                # y dejar que DocumentLoader maneje el error
+                try:
+                    if _validate_source(source):
+                        valid_sources.append(source)
+                        logger.info(f"URL GCS validada exitosamente: {source}")
+                    else:
+                        logger.warning(f"No se pudo validar URL GCS, pero intentaremos procesarla: {source}")
+                        valid_sources.append(source)
+                        gcs_sources_skipped.append(source)
+                except Exception as e:
+                    logger.warning(f"Error validando GCS {source}, pero intentaremos procesarla: {e}")
+                    valid_sources.append(source)
+                    gcs_sources_skipped.append(source)
             else:
-                invalid_sources.append(source)
+                # Para archivos locales, validar normalmente
+                if _validate_source(source):
+                    valid_sources.append(source)
+                else:
+                    invalid_sources.append(source)
         
         if not valid_sources:
             return f"❌ **Error**: Ninguna de las fuentes especificadas existe:\n" + "\n".join(f"• {s}" for s in invalid_sources)
@@ -151,6 +173,11 @@ async def reindex_rag_command(chat_id: str, collection: str = "default", sources
                 result += f"• {source}\n"
             if len(invalid_sources) > 5:
                 result += f"• ... y {len(invalid_sources) - 5} más\n"
+        
+        if gcs_sources_skipped:
+            result += f"\n🔄 **URLs GCS sin validar** ({len(gcs_sources_skipped)}) - se intentará procesar:\n"
+            for source in gcs_sources_skipped[:3]:  # Mostrar máximo 3
+                result += f"• {source}\n"
         
         # Paso 1: Eliminar colección existente si existe
         try:
