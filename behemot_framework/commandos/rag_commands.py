@@ -91,6 +91,10 @@ async def reindex_rag_command(chat_id: str, collection: str = "default", sources
         str: Resultado de la reindexación
     """
     try:
+        # Log de versión del framework
+        from behemot_framework import __version__
+        logger.info(f"Behemot Framework v{__version__} - Comando reindex_rag iniciado")
+        
         # Verificar permisos
         from behemot_framework.commandos.permissions import get_permission_manager
         
@@ -110,7 +114,11 @@ async def reindex_rag_command(chat_id: str, collection: str = "default", sources
             return "❌ **Error**: El sistema RAG no está habilitado. Configura ENABLE_RAG=true en tu archivo de configuración."
         
         # Obtener pipeline RAG con directorio temporal para escritura
-        config_override = {"RAG_PERSIST_DIRECTORY": "/tmp/chroma_db"}
+        import tempfile
+        temp_dir = tempfile.gettempdir()
+        persist_dir = os.path.join(temp_dir, "chroma_db_reindex")
+        config_override = {"RAG_PERSIST_DIRECTORY": persist_dir}
+        logger.info(f"Usando directorio temporal para ChromaDB: {persist_dir}")
         pipeline = RAGManager.get_pipeline(folder_name=collection, config_override=config_override)
         
         # Determinar fuentes de documentos
@@ -180,11 +188,11 @@ async def reindex_rag_command(chat_id: str, collection: str = "default", sources
                 
                 # También eliminar directorio físico para evitar carga automática
                 import shutil
-                persist_dir = pipeline.persist_directory
-                if persist_dir and os.path.exists(persist_dir):
-                    shutil.rmtree(persist_dir)
-                    logger.info(f"Directorio {persist_dir} eliminado físicamente")
-                    result += f"\n✅ Directorio {persist_dir} limpiado"
+                persist_dir_to_clean = pipeline.persist_directory
+                if persist_dir_to_clean and os.path.exists(persist_dir_to_clean):
+                    shutil.rmtree(persist_dir_to_clean)
+                    logger.info(f"Directorio {persist_dir_to_clean} eliminado físicamente")
+                    result += f"\n✅ Directorio {persist_dir_to_clean} limpiado"
                     
         except Exception as e:
             logger.warning(f"No se pudo eliminar la colección anterior: {e}")
