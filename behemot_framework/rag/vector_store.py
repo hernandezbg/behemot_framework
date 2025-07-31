@@ -184,12 +184,28 @@ class VectorStoreManager:
         client = ChromaClientManager.get_client(persist_directory, client_settings)
         
         # Crear instancia de Chroma con el cliente reutilizable
-        vectorstore = Chroma.from_documents(
-            documents=documents,
-            embedding=embeddings,
-            collection_name=collection_name,
-            client=client
-        )
+        try:
+            vectorstore = Chroma.from_documents(
+                documents=documents,
+                embedding=embeddings,
+                collection_name=collection_name,
+                client=client
+            )
+        except Exception as e:
+            # Si falla por permisos, intentar con cliente en memoria
+            if "readonly database" in str(e):
+                logger.warning(f"Error de permisos en ChromaDB, usando cliente en memoria: {e}")
+                # Crear cliente en memoria sin persistencia
+                memory_client = ChromaClientManager.get_client(persist_directory=None, client_settings=client_settings)
+                vectorstore = Chroma.from_documents(
+                    documents=documents,
+                    embedding=embeddings,
+                    collection_name=collection_name,
+                    client=memory_client
+                )
+                logger.info("✅ Índice Chroma creado en memoria exitosamente")
+            else:
+                raise
         
         logger.info(f"Índice Chroma creado exitosamente para colección '{collection_name}'")
         return vectorstore
