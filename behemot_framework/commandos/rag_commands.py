@@ -181,8 +181,16 @@ async def reindex_rag_command(chat_id: str, collection: str = "default", sources
             result += f"\n⚠️ No se pudo eliminar la colección anterior: {str(e)}"
         
         # Reinicializar el pipeline para asegurar estado limpio
+        logger.info(f"Reiniciando cache de pipelines RAG")
         RAGManager.reset_pipelines()
+        
+        # Obtener nuevo pipeline limpio
         pipeline = RAGManager.get_pipeline(folder_name=collection)
+        logger.info(f"Nuevo pipeline obtenido para colección '{collection}'")
+        
+        # Asegurar que el vectorstore esté limpio después de la eliminación
+        pipeline.vectorstore = None
+        logger.info("Vectorstore configurado a None para forzar creación nueva")
         
         # Paso 2: Ingerir documentos
         result += f"\n\n📥 **Procesando documentos**:\n"
