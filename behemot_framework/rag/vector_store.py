@@ -192,9 +192,13 @@ class VectorStoreManager:
                 client=client
             )
         except Exception as e:
-            # Si falla por permisos, intentar con cliente en memoria
-            if "readonly database" in str(e):
-                logger.warning(f"Error de permisos en ChromaDB, usando cliente en memoria: {e}")
+            # Si falla por problemas de base de datos, intentar con cliente en memoria
+            error_str = str(e)
+            if ("readonly database" in error_str or 
+                "unable to open database file" in error_str or 
+                "code: 14" in error_str or 
+                "code: 1032" in error_str):
+                logger.warning(f"Error de base de datos en ChromaDB, usando cliente en memoria: {e}")
                 # Crear cliente en memoria sin persistencia
                 memory_client = ChromaClientManager.get_client(persist_directory=None, client_settings=client_settings)
                 vectorstore = Chroma.from_documents(
