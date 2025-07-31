@@ -176,6 +176,15 @@ async def reindex_rag_command(chat_id: str, collection: str = "default", sources
                 pipeline.delete_collection()
                 result += "\n✅ Colección anterior eliminada correctamente"
                 logger.info(f"Colección '{collection}' eliminada")
+                
+                # También eliminar directorio físico para evitar carga automática
+                import shutil
+                persist_dir = pipeline.persist_directory
+                if persist_dir and os.path.exists(persist_dir):
+                    shutil.rmtree(persist_dir)
+                    logger.info(f"Directorio {persist_dir} eliminado físicamente")
+                    result += f"\n✅ Directorio {persist_dir} limpiado"
+                    
         except Exception as e:
             logger.warning(f"No se pudo eliminar la colección anterior: {e}")
             result += f"\n⚠️ No se pudo eliminar la colección anterior: {str(e)}"
