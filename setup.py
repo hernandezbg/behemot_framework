@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='behemot_framework',
-    version='0.2.0',
+    version='0.2.1',
     packages=find_packages(),
     install_requires=[
         # Dependencias del framework (copiar de requirements.txt)
