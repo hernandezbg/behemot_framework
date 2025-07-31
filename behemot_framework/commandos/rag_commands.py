@@ -109,8 +109,9 @@ async def reindex_rag_command(chat_id: str, collection: str = "default", sources
         if not config.get("ENABLE_RAG", False):
             return "❌ **Error**: El sistema RAG no está habilitado. Configura ENABLE_RAG=true en tu archivo de configuración."
         
-        # Obtener pipeline RAG
-        pipeline = RAGManager.get_pipeline(folder_name=collection)
+        # Obtener pipeline RAG con directorio temporal para escritura
+        config_override = {"RAG_PERSIST_DIRECTORY": "/tmp/chroma_db"}
+        pipeline = RAGManager.get_pipeline(folder_name=collection, config_override=config_override)
         
         # Determinar fuentes de documentos
         if sources:
@@ -193,9 +194,9 @@ async def reindex_rag_command(chat_id: str, collection: str = "default", sources
         logger.info(f"Reiniciando cache de pipelines RAG")
         RAGManager.reset_pipelines()
         
-        # Obtener nuevo pipeline limpio
-        pipeline = RAGManager.get_pipeline(folder_name=collection)
-        logger.info(f"Nuevo pipeline obtenido para colección '{collection}'")
+        # Obtener nuevo pipeline limpio con directorio temporal
+        pipeline = RAGManager.get_pipeline(folder_name=collection, config_override=config_override)
+        logger.info(f"Nuevo pipeline obtenido para colección '{collection}' en directorio temporal")
         
         # Asegurar que el vectorstore esté limpio después de la eliminación
         pipeline.vectorstore = None
