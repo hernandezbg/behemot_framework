@@ -51,7 +51,7 @@ setup(
     author='Your Name', # Reemplazar con tu nombre
     author_email='your.email@example.com', # Reemplazar con tu email
     description='A modular framework for building multimodal AI assistants.',
-    long_description=open('README.md').read(),
+    long_description=open('README.md', encoding='utf-8').read(),
     long_description_content_type='text/markdown',
     url='https://github.com/yourusername/behemot_framework', # Reemplazar con la URL de tu repositorio
     classifiers=[
