@@ -186,8 +186,7 @@ class GradioConnector:
                     label="Conversación",
                     height=400,
                     show_label=True,
-                    container=True,
-                    type="messages"
+                    container=True
                 )
                 
                 with gr.Row():
