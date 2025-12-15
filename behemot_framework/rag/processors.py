@@ -5,12 +5,12 @@ Módulo para procesar documentos y dividirlos en chunks
 from typing import List, Dict, Any, Optional
 import logging
 
-from langchain.text_splitter import (
+from langchain_text_splitters import (
     RecursiveCharacterTextSplitter,
     TokenTextSplitter,
     CharacterTextSplitter,
 )
-from langchain.docstore.document import Document
+from langchain_core.documents import Document
 
 
 logger = logging.getLogger(__name__)

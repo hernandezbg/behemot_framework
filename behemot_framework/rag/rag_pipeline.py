@@ -8,9 +8,9 @@ import logging
 import os
 import asyncio
 
-from langchain.docstore.document import Document
-from langchain.schema.embeddings import Embeddings
-from langchain.schema.retriever import BaseRetriever
+from langchain_core.documents import Document
+from langchain_core.embeddings import Embeddings
+from langchain_core.retrievers import BaseRetriever
 from langchain_community.vectorstores import Chroma
 from langchain_core.language_models import BaseLanguageModel
 
