@@ -17,6 +17,7 @@ setup(
         'sentence-transformers',
         'langchain>=0.1.0',
         'langchain-core>=0.1.0',
+        'langchain-classic>=1.0.0',
         'langchain-text-splitters>=0.0.1',
         'langchain-openai>=0.0.5',
         'langchain-community>=0.0.13',
