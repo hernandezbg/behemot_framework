@@ -1,7 +1,6 @@
 # app/security/langchain_safety.py
 from langchain_openai import OpenAI, ChatOpenAI
-from langchain.chains import LLMChain
-from langchain.prompts import PromptTemplate
+from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 # Actualizar importación de pydantic (corregir advertencia de deprecación)
 from pydantic import BaseModel, Field
