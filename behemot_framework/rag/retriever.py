@@ -6,7 +6,7 @@ Módulo para implementar retrievers para el sistema RAG
 from typing import List, Dict, Any, Optional, Union
 import logging
 
-from langchain.retrievers import ContextualCompressionRetriever
+from langchain.retrievers.contextual_compression import ContextualCompressionRetriever
 from langchain.retrievers.document_compressors import LLMChainExtractor
 from langchain_community.vectorstores import Chroma
 from langchain_core.retrievers import BaseRetriever
