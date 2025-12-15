@@ -19,7 +19,7 @@ from langchain_community.document_loaders import (
     S3FileLoader,
     GoogleDriveLoader,
 )
-from langchain.docstore.document import Document
+from langchain_core.documents import Document
 from langchain_community.document_loaders import UnstructuredMarkdownLoader
 # Para Google Drive
 import io

@@ -18,8 +18,8 @@ if platform.system() != 'Windows':
 else:
     fcntl = None
 
-from langchain.docstore.document import Document
-from langchain.schema.embeddings import Embeddings
+from langchain_core.documents import Document
+from langchain_core.embeddings import Embeddings
 
 # Intentar importar la versión nueva de Chroma primero
 try:
