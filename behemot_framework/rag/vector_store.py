@@ -281,11 +281,8 @@ class VectorStoreManager:
         logger.info(f"Añadiendo {len(documents)} documentos al índice Chroma")
         
         vectorstore.add_documents(documents)
-        
-        # Persistir si hay directorio de persistencia configurado
-        if vectorstore._persist_directory:
-            logger.info(f"Índice Chroma actualizado persistido en {vectorstore._persist_directory}")
-            
+
+        logger.info("Documentos añadidos al índice Chroma")
         return vectorstore
 
     @staticmethod
