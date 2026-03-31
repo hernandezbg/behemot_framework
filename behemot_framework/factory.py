@@ -49,7 +49,10 @@ class BehemotFactory:
         
         # Inicializar servicio de transcripción si se configura
         if config.get("ENABLE_VOICE", False):
-            self.transcriptor = TranscriptionService(api_key=config.get("GPT_API_KEY"))
+            self.transcriptor = TranscriptionService(
+                api_key=config.get("GPT_API_KEY"),
+                language=config.get("TRANSCRIPTION_LANGUAGE")
+            )
         else:
             self.transcriptor = None
             
