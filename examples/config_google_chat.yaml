@@ -1,0 +1,30 @@
+# Asistente con conector de Google Chat.
+# Variables sensibles en .env (provienen de la cuenta de servicio GCP):
+#   GC_PROJECT_ID=...
+#   GC_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+#   GC_CLIENT_EMAIL=mi-bot@mi-proyecto.iam.gserviceaccount.com
+#   GPT_API_KEY=sk-...
+
+ASSISTANT_NAME: "AsistenteGoogleChat"
+ASSISTANT_DESCRIPTION: "Bot para Google Chat con Behemot."
+
+MODEL_PROVIDER: "openai"
+MODEL_NAME: "gpt-4o-mini"
+MODEL_TEMPERATURE: 0.5
+MODEL_MAX_TOKENS: 800
+
+PROMPT_SISTEMA: |
+  Eres un asistente para espacios de Google Chat. Tono profesional y
+  directo. Cuando uses formato, prefiere listas con viñetas o
+  bloques de código markdown.
+
+SAFETY_LEVEL: "medium"
+
+ADMIN_MODE: "production"
+ADMIN_USERS:
+  - user_id: "users/123456789012345678901"   # Resource name de Google Chat
+    platform: "google_chat"
+    permissions: ["super_admin"]
+
+ENABLE_RAG: false
+ENABLE_VOICE: false

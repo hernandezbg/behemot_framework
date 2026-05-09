@@ -4,8 +4,12 @@ import inspect
 import os
 import logging
 import pkgutil
+import hmac
+import hashlib
+import re
+import secrets
 from typing import List, Dict, Any, Optional, Callable
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 
 from behemot_framework.config import Config, load_config
 from behemot_framework.models import ModelFactory
@@ -116,29 +120,50 @@ class BehemotFactory:
             return
                 
         self.telegram_connector = TelegramConnector(token)
-        
+
         # Priorizar la configuración específica de Telegram
         telegram_webhook_url = self.config.get("TELEGRAM_WEBHOOK_URL", "")
-        
+
         # Si no hay URL específica para Telegram, usar la URL general
         if not telegram_webhook_url:
             webhook_url = self.config.get("WEBHOOK_URL", "")
-            
+
             # Asegurarse de que la URL termine con /webhook para Telegram
             if webhook_url and not webhook_url.endswith("/webhook"):
                 telegram_webhook_url = webhook_url + "/webhook"
             else:
                 telegram_webhook_url = webhook_url
-        
+
+        # Resolver el secret_token para validar requests entrantes.
+        # Si no está configurado, generamos uno efímero — funciona en single-instance
+        # pero para multi-réplica el operador debe definir TELEGRAM_WEBHOOK_SECRET.
+        webhook_secret = self.config.get("TELEGRAM_WEBHOOK_SECRET", "")
+        if not webhook_secret:
+            webhook_secret = secrets.token_urlsafe(32)
+            logger.warning(
+                "TELEGRAM_WEBHOOK_SECRET no configurado — generado uno efímero. "
+                "En deploys multi-réplica define TELEGRAM_WEBHOOK_SECRET en config."
+            )
+        # Guardarlo en self para que el handler tenga acceso vía closure
+        self._telegram_webhook_secret = webhook_secret
+
         # Configurar webhook si está definido
         if telegram_webhook_url:
             from behemot_framework.startup import set_telegram_webhook
             logger.info(f"Configurando webhook de Telegram: {telegram_webhook_url}")
-            # Usar la URL específica para Telegram
-            set_telegram_webhook(token, telegram_webhook_url)
-        
+            # Pasar el secret_token a Telegram para que firme cada update
+            set_telegram_webhook(token, telegram_webhook_url, secret_token=webhook_secret)
+
         @fastapi_app.post("/webhook")
         async def procesar_mensaje_telegram(request: Request):
+            # Validar X-Telegram-Bot-Api-Secret-Token: rechazar updates no firmados
+            # por nuestro secret. Sin esta validación, cualquier atacante con la URL
+            # del webhook puede suplantar mensajes de cualquier usuario.
+            received_secret = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
+            if not hmac.compare_digest(received_secret, self._telegram_webhook_secret):
+                logger.warning("Webhook Telegram rechazado: secret_token inválido o ausente")
+                raise HTTPException(status_code=401, detail="Invalid webhook signature")
+
             update = await request.json()
             chat_id, mensaje = self.telegram_connector.extraer_mensaje(update)
             
@@ -225,17 +250,85 @@ class BehemotFactory:
             fastapi_app: Aplicación FastAPI a configurar
         """
         self.api_connector = ApiConnector()
-        
+
         # Verificar si el procesamiento de voz está habilitado
         voice_enabled = self.transcriptor is not None
-        
+
+        # Configuración de auth + rate limiting + límites de tamaño.
+        api_auth_mode = (self.config.get("API_AUTH_MODE", "none") or "none").lower()
+        api_keys = [k.strip() for k in (self.config.get("API_KEYS") or []) if k and k.strip()]
+        rate_limit_per_minute = int(self.config.get("API_RATE_LIMIT_PER_MINUTE", 60) or 0)
+        max_request_size = int(self.config.get("API_MAX_REQUEST_SIZE", 10 * 1024 * 1024))
+        max_audio_size = int(self.config.get("API_MAX_AUDIO_SIZE", 25 * 1024 * 1024))
+
+        if api_auth_mode == "api_key" and not api_keys:
+            logger.warning(
+                "API_AUTH_MODE='api_key' pero API_KEYS está vacía — la API "
+                "rechazará todas las requests hasta que se configuren claves."
+            )
+        if api_auth_mode == "none":
+            logger.warning(
+                "API_AUTH_MODE='none' — /api/chat queda accesible sin auth. "
+                "Solo recomendado detrás de un gateway/firewall."
+            )
+
+        # Rate limiting in-memory por IP (sin nuevas dependencias). Para deploys
+        # multi-réplica considera mover este contador a Redis.
+        from collections import defaultdict, deque
+        import time as _time
+        _request_log: Dict[str, deque] = defaultdict(deque)
+
+        def _enforce_rate_limit(client_ip: str) -> bool:
+            if rate_limit_per_minute <= 0:
+                return True
+            now = _time.monotonic()
+            window_start = now - 60.0
+            dq = _request_log[client_ip]
+            while dq and dq[0] < window_start:
+                dq.popleft()
+            if len(dq) >= rate_limit_per_minute:
+                return False
+            dq.append(now)
+            return True
+
+        def _enforce_api_auth(request: Request) -> None:
+            if api_auth_mode != "api_key":
+                return
+            received = request.headers.get("X-API-Key", "")
+            if not received or not api_keys:
+                raise HTTPException(status_code=401, detail="Missing API key")
+            for valid_key in api_keys:
+                if hmac.compare_digest(received, valid_key):
+                    return
+            raise HTTPException(status_code=401, detail="Invalid API key")
+
         @fastapi_app.post("/api/chat")
         async def process_api_message(request: Request):
             """Endpoint para recibir mensajes de texto o audio de cualquier cliente via API."""
+            # 1. Auth — antes que cualquier otro procesamiento.
+            _enforce_api_auth(request)
+
+            # 2. Rate limit por IP del cliente.
+            client_ip = request.client.host if request.client else "unknown"
+            if not _enforce_rate_limit(client_ip):
+                raise HTTPException(status_code=429, detail="Rate limit exceeded")
+
+            # 3. Validar tamaño del body via Content-Length (early reject).
+            content_length_header = request.headers.get("Content-Length")
+            if content_length_header:
+                try:
+                    declared_size = int(content_length_header)
+                except ValueError:
+                    raise HTTPException(status_code=400, detail="Invalid Content-Length")
+                ctype_check = request.headers.get("Content-Type", "")
+                size_cap = max_audio_size if "multipart/form-data" in ctype_check else max_request_size
+                if declared_size > size_cap:
+                    raise HTTPException(status_code=413, detail="Payload too large")
+
             try:
                 # Verificar el tipo de contenido
                 content_type = request.headers.get("Content-Type", "")
-                
+
                 if "multipart/form-data" in content_type and voice_enabled:
                     # Caso de archivo de audio
                     form = await request.form()
@@ -246,12 +339,17 @@ class BehemotFactory:
                     if not session_id or not audio_file:
                         return {"error": "Formato de mensaje inválido. Se requiere session_id y audio_file", "status": "error"}
                     
-                    # Guardar el archivo temporalmente
+                    # Guardar el archivo temporalmente. Limitamos el tamaño
+                    # efectivo aunque el Content-Length declarado sea menor al cap
+                    # (defensa contra clientes que mienten en el header).
                     import time
                     import os
-                    temp_path = f"temp_audio_{session_id}_{int(time.time())}.ogg"
+                    audio_content = await audio_file.read()
+                    if len(audio_content) > max_audio_size:
+                        raise HTTPException(status_code=413, detail="Audio too large")
+                    safe_session = re.sub(r"[^A-Za-z0-9_\-]", "_", str(session_id))[:40]
+                    temp_path = f"temp_audio_{safe_session}_{int(time.time())}.ogg"
                     with open(temp_path, "wb") as f:
-                        audio_content = await audio_file.read()
                         f.write(audio_content)
                     
                     # Transcribir el audio
@@ -384,7 +482,7 @@ class BehemotFactory:
             else:
                 whatsapp_webhook_url = webhook_url
         
-        logger.info(f"Configurando WhatsApp con phone_id={phone_number_id}, verify_token={verify_token}")
+        logger.info(f"Configurando WhatsApp con phone_id={phone_number_id} (verify_token configurado={'sí' if verify_token else 'no'})")
         logger.info(f"URL de webhook para WhatsApp: {whatsapp_webhook_url}")
         
         if not api_token or not phone_number_id:
@@ -397,7 +495,19 @@ class BehemotFactory:
             
         # Inicializar el conector con el token de API y el phone ID
         self.whatsapp_connector = WhatsAppConnector(api_token, phone_number_id)
-        
+
+        # App Secret de Meta para validar la firma HMAC-SHA256 de cada POST.
+        # Sin esto cualquiera con la URL del webhook puede inyectar mensajes
+        # forjados como cualquier número.
+        whatsapp_app_secret = self.config.get("WHATSAPP_APP_SECRET", "")
+        if not whatsapp_app_secret:
+            logger.warning(
+                "WHATSAPP_APP_SECRET no configurado: el webhook ACEPTARÁ cualquier "
+                "POST sin validar firma. Configurar el App Secret de Meta es "
+                "obligatorio en producción."
+            )
+        self._whatsapp_app_secret = whatsapp_app_secret
+
         @fastapi_app.get("/whatsapp-webhook")
         async def verify_whatsapp_webhook(
             hub_mode: str = Query(None, alias="hub.mode"),
@@ -405,7 +515,7 @@ class BehemotFactory:
             hub_challenge: str = Query(None, alias="hub.challenge")
         ):
             """Endpoint para verificar el webhook de WhatsApp."""
-            logger.info(f"Recibida solicitud de verificación: modo={hub_mode}, token={hub_verify_token}, challenge={hub_challenge}")
+            logger.info(f"Recibida solicitud de verificación de webhook WhatsApp (mode={hub_mode})")
             
             # Verificar el token con el token de verificación configurado
             if not verify_token:
@@ -413,17 +523,44 @@ class BehemotFactory:
                 return PlainTextResponse("Token de verificación no configurado", status_code=400)
                 
             if hub_mode == "subscribe" and hub_verify_token == verify_token:
-                logger.info(f"Verificación exitosa, devolviendo challenge: {hub_challenge}")
+                logger.info("Verificación de webhook WhatsApp exitosa")
                 return PlainTextResponse(hub_challenge)
             else:
-                logger.warning(f"Verificación fallida: token recibido={hub_verify_token}, esperado={verify_token}")
+                logger.warning("Verificación de webhook WhatsApp fallida (token no coincide o mode inválido)")
                 return PlainTextResponse("Verificación fallida", status_code=403)
         
         @fastapi_app.post("/whatsapp-webhook")
         async def procesar_mensaje_whatsapp(request: Request):
             """Endpoint para recibir mensajes de WhatsApp."""
             try:
-                update = await request.json()
+                # Leer el body CRUDO antes de parsear: la firma HMAC se calcula
+                # sobre los bytes exactos enviados por Meta, no sobre el JSON
+                # reserializado.
+                raw_body = await request.body()
+
+                # Validar firma X-Hub-Signature-256 si hay App Secret configurado.
+                # Si no hay secret, dejamos pasar (con warning emitido en setup) para
+                # facilitar entornos de desarrollo, pero el plan de seguridad exige
+                # configurarlo en producción.
+                if self._whatsapp_app_secret:
+                    received_sig = request.headers.get("X-Hub-Signature-256", "")
+                    if not received_sig.startswith("sha256="):
+                        logger.warning("Webhook WhatsApp rechazado: header X-Hub-Signature-256 ausente o malformado")
+                        raise HTTPException(status_code=401, detail="Missing signature")
+
+                    expected_sig = "sha256=" + hmac.new(
+                        self._whatsapp_app_secret.encode("utf-8"),
+                        raw_body,
+                        hashlib.sha256,
+                    ).hexdigest()
+
+                    if not hmac.compare_digest(received_sig, expected_sig):
+                        logger.warning("Webhook WhatsApp rechazado: firma HMAC inválida")
+                        raise HTTPException(status_code=401, detail="Invalid signature")
+
+                # Solo después de validar parseamos el JSON
+                import json as _json
+                update = _json.loads(raw_body) if raw_body else {}
                 logger.debug(f"Mensaje de WhatsApp recibido: {update}")
                 
                 # Verificar que sea un mensaje

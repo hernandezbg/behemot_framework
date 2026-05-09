@@ -108,10 +108,48 @@ class DocumentLoader:
 
     @staticmethod
     def load_url(url: str) -> List[Document]:
-        """Carga contenido desde una URL"""
+        """Carga contenido desde una URL.
+
+        Aplica anti-SSRF: rechaza esquemas no http(s), hosts de metadata
+        cloud (169.254.169.254 y similares), y resuelve el hostname para
+        bloquear IPs privadas/loopback/link-local.
+
+        Además sanitiza el HTML resultante para reducir el riesgo de prompt
+        injection vía contenido externo (RAG poisoning): elimina <script>,
+        <style>, <iframe> y reduce el contenido a texto plano cuando es
+        posible.
+        """
+        from behemot_framework.config import Config
+        from behemot_framework.rag.source_guard import (
+            get_policy_from_config,
+            validate_url,
+        )
+
+        policy = get_policy_from_config(Config)
+        validate_url(
+            url,
+            allowed_hosts=policy["allowed_url_hosts"],
+            allow_private_networks=policy["allow_private_networks"],
+        )
+
         logger.info(f"Cargando contenido desde URL: {url}")
         loader = WebBaseLoader(url)
-        return loader.load()
+        docs = loader.load()
+
+        # Sanitización defensiva del contenido: extraer texto plano, eliminar
+        # tags peligrosos. BeautifulSoup ya es transitivo de langchain pero el
+        # bloque es resiliente si por alguna razón no está disponible.
+        try:
+            from bs4 import BeautifulSoup
+            for doc in docs:
+                soup = BeautifulSoup(doc.page_content or "", "html.parser")
+                for tag in soup(["script", "style", "iframe", "noscript", "object", "embed"]):
+                    tag.decompose()
+                doc.page_content = soup.get_text(separator=" ", strip=True)
+        except Exception as e:
+            logger.warning(f"Sanitización HTML omitida ({type(e).__name__}): {e}")
+
+        return docs
 
     @staticmethod
     def load_directory(dir_path: str, glob_pattern: str = "**/*") -> List[Document]:
@@ -339,18 +377,24 @@ class DocumentLoader:
     @classmethod
     def load_document(cls, source: str) -> List[Document]:
         """
-        Carga un documento desde una fuente detectando automáticamente el tipo
-        
+        Carga un documento desde una fuente detectando automáticamente el tipo.
+
+        Aplica validación de seguridad: rutas locales deben estar en
+        RAG_ALLOWED_ROOTS y URLs no pueden apuntar a redes privadas / metadata
+        cloud. Esto previene path traversal y SSRF cuando la fuente proviene de
+        un input no totalmente confiable (config YAML compartido, comando
+        &reindex_rag, etc.).
+
         Args:
             source: Ruta al archivo, URL, o URI especial
-            
+
         Returns:
             Lista de documentos cargados
         """
         # Detectar el tipo de fuente
         if source.startswith(("http://", "https://")):
             return cls.load_url(source)
-        
+
         # Patrones especiales para GCP (soporta tanto gcp:// como gs://)
         elif source.startswith(("gcp://", "gs://")):
             if source.startswith("gcp://"):
@@ -378,21 +422,30 @@ class DocumentLoader:
             file_id = source[9:]
             return cls.load_google_drive(file_id)
         
-        # Archivo local
+        # Archivo local — validar contra RAG_ALLOWED_ROOTS antes de leer
         elif os.path.exists(source):
-            if os.path.isdir(source):
-                return cls.load_directory(source)
-                
-            ext = os.path.splitext(source)[1].lower()
+            from behemot_framework.config import Config
+            from behemot_framework.rag.source_guard import (
+                get_policy_from_config,
+                validate_local_path,
+            )
+
+            policy = get_policy_from_config(Config)
+            safe_path = validate_local_path(source, policy["allowed_roots"])
+
+            if os.path.isdir(safe_path):
+                return cls.load_directory(safe_path)
+
+            ext = os.path.splitext(safe_path)[1].lower()
             if ext == ".pdf":
-                return cls.load_pdf(source)
+                return cls.load_pdf(safe_path)
             elif ext == ".csv":
-                return cls.load_csv(source)
+                return cls.load_csv(safe_path)
             elif ext in [".md", ".markdown"]:
-                return cls.load_markdown(source)
+                return cls.load_markdown(safe_path)
             else:
                 # Por defecto, intenta cargar como texto
-                return cls.load_text(source)
+                return cls.load_text(safe_path)
         else:
             raise FileNotFoundError(f"El archivo o recurso no existe o no es accesible: {source}")
 

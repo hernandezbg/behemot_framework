@@ -13,7 +13,8 @@ class GPTModel(BaseModel):
     def __init__(self, api_key: str):
         self.api_key = api_key
         self.client = OpenAI(api_key=self.api_key)
-        logger.info("API key cargada: %s", self.api_key)
+        # No loguear el valor de la API key; solo confirmar que se cargó
+        logger.info("API key OpenAI cargada (longitud=%d)", len(api_key) if api_key else 0)
 
         # Cargar la configuración para obtener los parámetros del modelo
         self.config = Config.get_config()  # Cambiado de load_config() a Config.get_config()

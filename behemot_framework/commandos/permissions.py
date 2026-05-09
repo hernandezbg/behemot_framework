@@ -10,13 +10,17 @@ class PermissionManager:
     Gestiona permisos de usuarios para comandos administrativos.
     """
     
-    # Definición de permisos y comandos asociados
+    # Definición de permisos y comandos asociados.
+    # `rag` solo concede búsqueda y consulta; `rag_admin` añade reindexación —
+    # esta operación puede ingerir nuevas fuentes y se separó para minimizar
+    # superficie ante prompt injection / abuso de comandos.
     PERMISSION_GROUPS = {
         "user_info": ["whoami"],
         "broadcast": ["sendmsg", "list_users"],
         "user_management": ["delete_session", "list_sessions", "analyze_session"],
         "system": ["status", "monitor", "reset_to_fabric", "clear_msg"],
-        "rag": ["reindex_rag", "rag_status", "rag_search", "rag_collections"],
+        "rag": ["rag_status", "rag_search", "rag_collections"],
+        "rag_admin": ["reindex_rag"],
         "super_admin": ["*"]  # Acceso a todos los comandos
     }
     
@@ -25,14 +29,26 @@ class PermissionManager:
         Inicializa el gestor de permisos.
         """
         self.config = Config.get_config()
-        self.admin_mode = self.config.get("ADMIN_MODE", "dev").lower()
+        # Default seguro: production. En "dev" NO se conceden permisos automáticos:
+        # solo permite logs adicionales y omitir validaciones no relacionadas con
+        # autorización. Para que un usuario sea admin debe estar en ADMIN_USERS.
+        self.admin_mode = self.config.get("ADMIN_MODE", "production").lower()
         self.admin_users = self._load_admin_users()
-        
+
         logger.info(f"🔐 PermissionManager inicializado en modo: {self.admin_mode}")
         if self.admin_users:
             logger.info(f"👥 {len(self.admin_users)} administradores configurados")
+        elif self.admin_mode == "dev":
+            logger.warning(
+                "⚠️  ADMIN_MODE='dev' sin ADMIN_USERS configurados: ningún usuario "
+                "podrá ejecutar comandos administrativos. Añade ADMIN_USERS al "
+                "config para habilitar admins."
+            )
         else:
-            logger.info("⚠️ No hay administradores configurados - modo desarrollo activo")
+            logger.warning(
+                "⚠️  ADMIN_MODE='production' sin ADMIN_USERS configurados: los "
+                "comandos administrativos quedan deshabilitados (comportamiento seguro)."
+            )
     
     def _load_admin_users(self) -> Dict[str, Dict]:
         """
@@ -65,48 +81,46 @@ class PermissionManager:
     def is_admin(self, user_id: str, platform: str = "any") -> bool:
         """
         Verifica si un usuario es administrador.
-        
+
+        El privilegio se concede ÚNICAMENTE si el usuario está listado en
+        ADMIN_USERS. El antiguo bypass por `admin_mode == "dev"` se eliminó por
+        seguridad: dejaba super_admin abierto a cualquiera por defecto.
+
         Args:
             user_id: ID del usuario
             platform: Plataforma del usuario
-            
+
         Returns:
             True si es administrador
         """
-        # En modo desarrollo, todos son admin
-        if self.admin_mode == "dev":
-            logger.debug(f"🔓 Modo dev: {user_id} tiene acceso admin automático")
-            return True
-        
         # Buscar en configuración específica
         keys_to_check = [
             f"{user_id}:{platform}",  # Específico de plataforma
             f"{user_id}:any"          # Cualquier plataforma
         ]
-        
+
         for key in keys_to_check:
             if key in self.admin_users:
                 logger.debug(f"✅ {user_id} encontrado como admin: {key}")
                 return True
-        
+
         logger.debug(f"❌ {user_id} no es administrador")
         return False
     
     def get_user_permissions(self, user_id: str, platform: str = "any") -> List[str]:
         """
         Obtiene los permisos de un usuario.
-        
+
+        El bypass de "todos super_admin en modo dev" se eliminó. Los permisos
+        provienen exclusivamente de la lista ADMIN_USERS.
+
         Args:
             user_id: ID del usuario
             platform: Plataforma del usuario
-            
+
         Returns:
             Lista de permisos del usuario
         """
-        # En modo desarrollo, todos tienen todos los permisos
-        if self.admin_mode == "dev":
-            return ["user_info", "broadcast", "user_management", "system", "rag", "super_admin"]
-        
         # Si no es admin, solo permisos básicos
         if not self.is_admin(user_id, platform):
             return ["user_info"]  # Solo puede ver su propia información
@@ -198,7 +212,7 @@ class PermissionManager:
         
         # Información detallada de permisos
         permission_details = {}
-        for permission in ["user_info", "broadcast", "user_management", "system", "rag", "super_admin"]:
+        for permission in ["user_info", "broadcast", "user_management", "system", "rag", "rag_admin", "super_admin"]:
             has_perm = permission in user_permissions
             commands = self.PERMISSION_GROUPS.get(permission, [])
             permission_details[permission] = {
@@ -230,7 +244,8 @@ class PermissionManager:
             "broadcast": "Puede enviar mensajes masivos",
             "user_management": "Puede gestionar usuarios y sesiones",
             "system": "Puede acceder a comandos de sistema",
-            "rag": "Puede gestionar el sistema RAG (reindexar, buscar)",
+            "rag": "Puede consultar el sistema RAG (búsqueda, estado, colecciones)",
+            "rag_admin": "Puede reindexar el sistema RAG (ingesta de fuentes)",
             "super_admin": "Acceso completo a todos los comandos"
         }
         return descriptions.get(permission, "Permiso desconocido")

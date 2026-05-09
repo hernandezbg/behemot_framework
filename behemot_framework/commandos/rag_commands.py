@@ -123,8 +123,50 @@ async def reindex_rag_command(chat_id: str, collection: str = "default", sources
         
         # Determinar fuentes de documentos
         if sources:
-            # Usar fuentes especificadas por el usuario
-            document_sources = [s.strip() for s in sources.split(",")]
+            # Usar fuentes especificadas por el usuario.
+            # Validar cada fuente contra la política RAG (RAG_ALLOWED_ROOTS /
+            # RAG_ALLOWED_URL_HOSTS) antes de pasar al loader. Esto bloquea
+            # path traversal (`/etc/passwd`) y SSRF (`http://169.254.169.254`)
+            # cuando un usuario con permiso `rag_admin` invoca el comando.
+            from behemot_framework.rag.source_guard import (
+                get_policy_from_config,
+                validate_local_path,
+                validate_url,
+                RagSourceRejected,
+            )
+
+            policy = get_policy_from_config(Config)
+            document_sources = []
+            rejected = []
+            for raw in [s.strip() for s in sources.split(",") if s.strip()]:
+                try:
+                    if raw.startswith(("http://", "https://")):
+                        validate_url(
+                            raw,
+                            allowed_hosts=policy["allowed_url_hosts"],
+                            allow_private_networks=policy["allow_private_networks"],
+                        )
+                        document_sources.append(raw)
+                    elif raw.startswith(("gcp://", "gs://", "s3://", "gdrive://")):
+                        # Backends gestionados (cloud storage) — confianza delegada
+                        # al control de acceso del bucket / drive.
+                        document_sources.append(raw)
+                    else:
+                        validate_local_path(raw, policy["allowed_roots"])
+                        document_sources.append(raw)
+                except RagSourceRejected as exc:
+                    rejected.append(f"{raw} → {exc}")
+
+            if rejected:
+                bullets = "\n".join(f"- {r}" for r in rejected)
+                return (
+                    "❌ **Fuentes rechazadas por la política RAG**:\n"
+                    f"{bullets}\n\n"
+                    "Configura `RAG_ALLOWED_ROOTS` y/o `RAG_ALLOWED_URL_HOSTS` "
+                    "para autorizarlas explícitamente."
+                )
+            if not document_sources:
+                return "❌ **Error**: Ninguna fuente válida tras la validación de seguridad."
         else:
             # Usar fuentes de la configuración
             document_sources = config.get("RAG_DOCUMENT_SOURCES", [])

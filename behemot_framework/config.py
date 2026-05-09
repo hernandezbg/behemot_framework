@@ -139,7 +139,14 @@ class Config:
 
             # Configuración específica por conector
             "TELEGRAM_WEBHOOK_URL": os.getenv("TELEGRAM_WEBHOOK_URL", ""),
+            # Secreto compartido con Telegram para validar X-Telegram-Bot-Api-Secret-Token.
+            # Si está vacío, el framework genera uno aleatorio en runtime (no persistente).
+            # Para deploys multi-réplica/serverless, definirlo explícitamente.
+            "TELEGRAM_WEBHOOK_SECRET": os.getenv("TELEGRAM_WEBHOOK_SECRET", ""),
             "WHATSAPP_WEBHOOK_URL": os.getenv("WHATSAPP_WEBHOOK_URL", ""),
+            # App Secret de Meta (Facebook Developer Console) para validar firma HMAC
+            # del header X-Hub-Signature-256 en webhooks de WhatsApp Cloud API.
+            "WHATSAPP_APP_SECRET": os.getenv("WHATSAPP_APP_SECRET", ""),
             "API_WEBHOOK_URL": os.getenv("API_WEBHOOK_URL", ""),
             "ENABLE_VOICE": os.getenv("ENABLE_VOICE", "true").lower() in ("true", "1", "yes"),
             
@@ -148,11 +155,50 @@ class Config:
             
             # Configuración de seguridad
             "SAFETY_LEVEL": os.getenv("SAFETY_LEVEL", "medium"),  # low, medium, high
+
+            # Configuración de administración (default seguro: production sin admins).
+            # Para habilitar comandos admin se debe definir ADMIN_USERS en el YAML.
+            "ADMIN_MODE": os.getenv("ADMIN_MODE", "production"),  # production | dev
+            "ADMIN_USERS": [],
+
+            # Bearer token requerido para acceder a /status. Si está vacío, /status
+            # queda accesible sin auth (uso solo recomendado detrás de firewall).
+            "STATUS_API_TOKEN": os.getenv("STATUS_API_TOKEN", ""),
+
+            # Auth para el endpoint /api/chat: none | api_key. En modo api_key
+            # se valida X-API-Key contra API_KEYS (lista, comparación constant-time).
+            "API_AUTH_MODE": os.getenv("API_AUTH_MODE", "none"),
+            "API_KEYS": (
+                os.getenv("API_KEYS", "").split(",")
+                if os.getenv("API_KEYS")
+                else []
+            ),
+
+            # Rate limiting de /api/chat (in-memory, por IP). 0 desactiva el límite.
+            "API_RATE_LIMIT_PER_MINUTE": int(os.getenv("API_RATE_LIMIT_PER_MINUTE", "60")),
+            # Tope de tamaño de body para JSON y audios (bytes).
+            "API_MAX_REQUEST_SIZE": int(os.getenv("API_MAX_REQUEST_SIZE", str(10 * 1024 * 1024))),
+            "API_MAX_AUDIO_SIZE": int(os.getenv("API_MAX_AUDIO_SIZE", str(25 * 1024 * 1024))),
             
             # Configuración de RAG (Retrieval Augmented Generation)
             "ENABLE_RAG": os.getenv("ENABLE_RAG", "false").lower() in ("true", "1", "yes"),
             "AUTO_RAG": os.getenv("AUTO_RAG", "false").lower() in ("true", "1", "yes"),  # Nuevo: RAG automático
             "RAG_FOLDERS": os.getenv("RAG_FOLDERS", "").split(",") if os.getenv("RAG_FOLDERS") else [],
+            # Política anti-path-traversal y anti-SSRF para fuentes RAG.
+            # Si RAG_ALLOWED_ROOTS no se define, se usa RAG_FOLDERS como fallback.
+            "RAG_ALLOWED_ROOTS": (
+                os.getenv("RAG_ALLOWED_ROOTS", "").split(",")
+                if os.getenv("RAG_ALLOWED_ROOTS")
+                else None
+            ),
+            "RAG_ALLOWED_URL_HOSTS": (
+                os.getenv("RAG_ALLOWED_URL_HOSTS", "").split(",")
+                if os.getenv("RAG_ALLOWED_URL_HOSTS")
+                else []
+            ),
+            "RAG_ALLOW_PRIVATE_NETWORKS": os.getenv(
+                "RAG_ALLOW_PRIVATE_NETWORKS", "false"
+            ).lower() in ("true", "1", "yes"),
             "GCP_BUCKET_NAME": os.getenv("GCP_BUCKET_NAME", ""),
             
             # Configuración RAG avanzada

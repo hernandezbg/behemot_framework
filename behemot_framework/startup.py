@@ -20,31 +20,46 @@ logger = logging.getLogger(__name__)
 
 # ----- Funciones para Telegram -----
 
-def set_telegram_webhook(token: str, webhook_url: str) -> bool:
+def set_telegram_webhook(
+    token: str,
+    webhook_url: str,
+    secret_token: Optional[str] = None,
+) -> bool:
     """
     Configura el webhook de Telegram.
-    
+
+    Si se proporciona `secret_token`, Telegram lo enviará en cada update via
+    el header `X-Telegram-Bot-Api-Secret-Token`. El handler debe validarlo
+    con `hmac.compare_digest` para rechazar requests no provenientes de
+    Telegram.
+
     Args:
         token: Token de bot de Telegram
         webhook_url: URL del webhook a configurar
-        
+        secret_token: Secreto opcional (1-256 chars: A-Z, a-z, 0-9, _ y -)
+
     Returns:
         bool: True si se configuró correctamente, False en caso contrario
     """
     if not webhook_url:
         logger.error("URL de webhook no proporcionada")
         return False
-        
+
     url = f"https://api.telegram.org/bot{token}/setWebhook"
     params = {"url": webhook_url}
-    
+    if secret_token:
+        params["secret_token"] = secret_token
+
     try:
         response = requests.get(url, params=params)
-        
+
         if response.status_code == 200:
             result = response.json()
             if result.get("ok"):
-                logger.info(f"Webhook de Telegram configurado: {webhook_url}")
+                logger.info(
+                    f"Webhook de Telegram configurado: {webhook_url}"
+                    f" (secret_token={'sí' if secret_token else 'NO — webhook sin firma'})"
+                )
                 return True
             else:
                 logger.error(f"Error al configurar webhook: {result.get('description')}")
@@ -52,7 +67,7 @@ def set_telegram_webhook(token: str, webhook_url: str) -> bool:
             logger.error(f"Error HTTP al configurar webhook: {response.status_code}")
     except Exception as e:
         logger.error(f"Excepción al configurar webhook: {e}")
-    
+
     return False
 
 # ----- Funciones para RAG -----

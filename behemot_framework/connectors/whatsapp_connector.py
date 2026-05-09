@@ -6,6 +6,7 @@ import tempfile
 import logging
 import json
 import asyncio
+import uuid
 from typing import Optional, Dict, Any, Tuple
 
 logger = logging.getLogger(__name__)
@@ -139,9 +140,13 @@ class WhatsAppConnector:
             else:
                 extension = ".bin"
             
-            # 4. Guardar en archivo temporal
+            # 4. Guardar en archivo temporal. Nombre generado con uuid4 para
+            # neutralizar cualquier intento de path traversal vía media_id si
+            # la validación de firma fallara o el atacante controlara el
+            # contenido del webhook.
             temp_dir = tempfile.gettempdir()
-            local_path = os.path.join(temp_dir, f"whatsapp_media_{media_id}{extension}")
+            safe_ext = extension if extension.startswith(".") and extension.replace(".", "").isalnum() else ".bin"
+            local_path = os.path.join(temp_dir, f"whatsapp_media_{uuid.uuid4().hex}{safe_ext}")
             
             with open(local_path, 'wb') as f:
                 for chunk in download_response.iter_content(chunk_size=8192):
@@ -264,13 +269,14 @@ class WhatsAppConnector:
         Returns:
             Challenge si la verificación es exitosa, None si falla
         """
-        logger.info(f"Verificando token: hub_mode={hub_mode}, token recibido='{hub_verify_token}', token esperado='{verify_token}'")
-        
+        # Nunca loguear los tokens en claro — solo el modo y resultado de la verificación
+        logger.info(f"Verificando token de webhook WhatsApp (mode={hub_mode})")
+
         if hub_mode == "subscribe" and hub_verify_token == verify_token:
-            logger.info(f"Verificación de webhook de WhatsApp exitosa")
+            logger.info("Verificación de webhook de WhatsApp exitosa")
             return hub_challenge
-        
-        logger.warning(f"Verificación de webhook de WhatsApp fallida: token recibido='{hub_verify_token}', token esperado='{verify_token}'")
+
+        logger.warning("Verificación de webhook de WhatsApp fallida")
         return None
     
 

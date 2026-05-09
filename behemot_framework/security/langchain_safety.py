@@ -123,19 +123,25 @@ UNSAFE: [razón específica]
                     "reason": reason
                 }
             else:
-                # Si no reconoce el formato, permitir el contenido (fail-safe)
-                logger.warning(f"⚠️ Formato no reconocido del filtro, permitiendo contenido: {result}")
+                # Formato no reconocido: tratar como UNSAFE (fail-closed).
+                # Permitir contenido ante un fallo del filtro convertía cualquier
+                # timeout/respuesta corrupta en un bypass silencioso.
+                logger.warning(
+                    f"⚠️ Formato no reconocido del filtro, bloqueando por defecto: {result}"
+                )
                 return {
-                    "is_safe": True,
-                    "filtered_content": content,
-                    "reason": None
+                    "is_safe": False,
+                    "filtered_content": "Lo siento, no puedo procesar este mensaje en este momento. Inténtalo de nuevo.",
+                    "reason": "Formato de respuesta del filtro no reconocido (fail-closed)"
                 }
-                
+
         except Exception as e:
-            logger.error(f"❌ Error en filtro de seguridad: {str(e)}")
-            # En caso de error, permitimos el contenido (fail-safe)
+            # Fail-closed ante error: si el filtro no responde, no asumimos
+            # que el contenido es seguro. El operador debe monitorizar estos
+            # warnings — un atacante puede causarlos provocando timeouts.
+            logger.error(f"❌ Error en filtro de seguridad (fail-closed): {str(e)}")
             return {
-                "is_safe": True,
-                "filtered_content": content,
-                "reason": None
+                "is_safe": False,
+                "filtered_content": "Lo siento, no puedo procesar este mensaje en este momento. Inténtalo de nuevo.",
+                "reason": f"Filtro de seguridad no disponible: {type(e).__name__}"
             }

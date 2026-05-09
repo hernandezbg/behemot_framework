@@ -185,32 +185,71 @@ SAFETY_LEVEL: "medium"  # off, low, medium, high
 
 ### Configurar Sistema de Permisos
 
-El framework incluye un sistema de permisos granular para comandos administrativos:
+El framework incluye un sistema de permisos granular para comandos administrativos. **Por defecto ningún usuario es admin** — debes declarar explícitamente quién puede ejecutar comandos privilegiados.
 
 ```yaml
 # En config/mi_asistente.yaml
-ADMIN_MODE: "production"  # dev, production
+ADMIN_MODE: "production"  # default seguro
 
 ADMIN_USERS:
   - user_id: "1069636329"        # Tu ID de usuario
     platform: "telegram"        # telegram, whatsapp, google_chat, api
-    permissions: ["super_admin"] # super_admin, broadcast, user_management, system
+    permissions: ["super_admin"] # super_admin, broadcast, user_management, system, rag_admin
 ```
-
-**Modos disponibles:**
-- `"dev"` - **Desarrollo** - Todos los usuarios tienen permisos de admin
-- `"production"` - **Producción** - Solo usuarios configurados tienen permisos
 
 **Permisos disponibles:**
 - `"user_info"` - Ver información propia (`&whoami`)
 - `"broadcast"` - Envío masivo (`&sendmsg`, `&list_users`)
 - `"user_management"` - Gestión de usuarios (`&delete_session`, `&list_sessions`)
 - `"system"` - Comandos de sistema (`&status`, `&monitor`, `&clear_msg`)
+- `"rag"` - Consulta del sistema RAG (`&rag_search`, `&rag_status`)
+- `"rag_admin"` - Reindexación RAG (`&reindex_rag`) — separado para minimizar superficie
 - `"super_admin"` - **Todos los comandos** (acceso total)
 
 **Comandos útiles:**
 - `&whoami` - Ver tu ID de usuario y permisos actuales
 - `&help` - Lista completa de comandos disponibles
+
+### 🔐 Seguridad — Variables clave para producción
+
+El framework aplica defaults seguros, pero hay variables que **debes configurar antes de exponer un agente a internet**:
+
+```bash
+# .env
+
+# --- Webhooks firmados (CRÍTICO en producción) ---
+TELEGRAM_WEBHOOK_SECRET=...        # auto-generado si falta (no persiste entre réplicas)
+WHATSAPP_APP_SECRET=...            # del Meta Developer Console — sin esto el webhook acepta cualquier POST
+
+# --- RAG anti-path-traversal / anti-SSRF ---
+RAG_ALLOWED_ROOTS=./docs,./manuals       # paths permitidos para fuentes locales
+RAG_ALLOWED_URL_HOSTS=docs.miempresa.com # whitelist opcional para URLs HTTP/HTTPS
+# RAG_ALLOW_PRIVATE_NETWORKS=false       # default: rechaza IPs privadas/loopback/metadata cloud
+
+# --- Endpoints expuestos ---
+STATUS_API_TOKEN=...               # Bearer token para /status; sin esto queda abierto
+API_AUTH_MODE=api_key              # none | api_key
+API_KEYS=key-1,key-2               # solo si API_AUTH_MODE=api_key
+API_RATE_LIMIT_PER_MINUTE=60       # 0 desactiva
+API_MAX_REQUEST_SIZE=10485760      # 10MB
+API_MAX_AUDIO_SIZE=26214400        # 25MB
+
+# --- Privacidad de logs ---
+LOG_REDACT_PII=true                # enmascara emails, teléfonos y tokens largos
+```
+
+**Garantías que ofrece el framework:**
+
+| Vector | Mitigación |
+|---|---|
+| Suplantación de mensajes en webhooks | Validación de `X-Telegram-Bot-Api-Secret-Token` y `X-Hub-Signature-256` (HMAC-SHA256) |
+| Path traversal en RAG | `realpath` + lista blanca `RAG_ALLOWED_ROOTS` |
+| SSRF a metadata cloud | Bloqueo de IPs privadas, link-local y dominios `metadata.*.internal` |
+| Tool poisoning vía prompt injection | Validación JSONSchema de argumentos antes de invocar handlers |
+| Prompt injection vía RAG | Marcadores `<untrusted_context>` + sanitización HTML al cargar URLs |
+| Bypass del filtro de seguridad | Fail-closed ante errores; aplica a cualquier `MODEL_PROVIDER` |
+| Fuga de secretos en logs | Filtro automático de patrones (OpenAI/Anthropic/GitHub/Slack/Telegram) y PII |
+| DoS económico en `/api/chat` | Rate limiting por IP + límites de body/audio |
 
 ### Configurar Variables de Entorno
 
@@ -260,6 +299,20 @@ GC_CLIENT_EMAIL=...
 - **📨 Mensajería Masiva**: Envío de mensajes a todos los usuarios activos
 - **💾 Persistencia de Contexto**: Conversaciones continuas con Redis
 - **📊 Diagnósticos**: Monitoreo automático de componentes
+
+## 📂 Ejemplos
+
+El directorio [`examples/`](./examples) contiene plantillas listas para arrancar:
+
+| Ejemplo | Qué muestra |
+|---|---|
+| [`minimal_assistant.py`](./examples/minimal_assistant.py) + [`config_minimal.yaml`](./examples/config_minimal.yaml) | Configuración mínima absoluta (solo API REST + Gradio local) |
+| [`telegram_assistant.py`](./examples/telegram_assistant.py) + [`config_telegram.yaml`](./examples/config_telegram.yaml) | Bot de Telegram con firma de webhook |
+| [`whatsapp_assistant.py`](./examples/whatsapp_assistant.py) + [`config_whatsapp.yaml`](./examples/config_whatsapp.yaml) | WhatsApp Business con HMAC validation |
+| [`google_chat_assistant.py`](./examples/google_chat_assistant.py) + [`config_google_chat.yaml`](./examples/config_google_chat.yaml) | Bot para Google Chat |
+| [`api_assistant.py`](./examples/api_assistant.py) + [`config_api.yaml`](./examples/config_api.yaml) | Endpoint REST con auth `X-API-Key` y rate limiting |
+
+Cada ejemplo es ejecutable directamente con `python examples/<nombre>.py`.
 
 ## 📚 Documentación Adicional
 

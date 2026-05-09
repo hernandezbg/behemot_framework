@@ -1,0 +1,26 @@
+# Configuración MÍNIMA de un asistente Behemot.
+# Solo lo imprescindible para tener un agente funcional vía API REST + Gradio.
+
+# --- Identidad del asistente ---
+ASSISTANT_NAME: "AsistenteMinimo"
+ASSISTANT_DESCRIPTION: "Ejemplo mínimo del framework Behemot."
+
+# --- Modelo ---
+MODEL_PROVIDER: "openai"        # openai | gemini | vertex
+MODEL_NAME: "gpt-4o-mini"
+MODEL_TEMPERATURE: 0.7
+MODEL_MAX_TOKENS: 500
+
+# --- Personalidad ---
+PROMPT_SISTEMA: |
+  Eres un asistente útil, conciso y amigable. Responde en español
+  salvo que el usuario te hable en otro idioma.
+
+# --- Seguridad (defaults razonables) ---
+SAFETY_LEVEL: "medium"           # off | low | medium | high
+ADMIN_MODE: "production"         # default seguro
+# ADMIN_USERS: []                # sin admins por defecto
+
+# --- Funcionalidades opcionales ---
+ENABLE_RAG: false
+ENABLE_VOICE: false

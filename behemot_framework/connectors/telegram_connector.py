@@ -2,6 +2,7 @@
 import requests
 import os
 import tempfile
+import uuid
 
 class TelegramConnector:
     def __init__(self, token: str):
@@ -75,9 +76,12 @@ class TelegramConnector:
             else:
                 extension = ".bin"
             
-            # Descargar el archivo
+            # Descargar el archivo. Nombre local generado con uuid4 para evitar
+            # path traversal vía file_id manipulado (relevante si la firma del
+            # webhook fallara o se desactivara).
             temp_dir = tempfile.gettempdir()
-            local_path = os.path.join(temp_dir, f"telegram_{file_type}_{file_id}{extension}")
+            safe_ext = extension if extension.startswith(".") and extension.replace(".", "").isalnum() else ".bin"
+            local_path = os.path.join(temp_dir, f"telegram_{file_type}_{uuid.uuid4().hex}{safe_ext}")
             
             with requests.get(download_url, stream=True) as r:
                 r.raise_for_status()

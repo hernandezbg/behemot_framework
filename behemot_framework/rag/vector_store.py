@@ -87,21 +87,37 @@ class ChromaClientManager:
                             
                     logger.info(f"🔒 Lock obtenido para ChromaDB: {persist_directory}")
                 else:
-                    # En Windows, usar un enfoque diferente con archivo de bloqueo
+                    # En Windows: lock por creación atómica (O_CREAT|O_EXCL).
+                    # `Path.touch()` y `exists()` no eran atómicos: dos procesos
+                    # podían encontrar el lock libre y crearlo a la vez,
+                    # corrompiendo el directorio Chroma.
                     lock_file_path = Path(persist_directory) / ".chroma_lock"
-                    max_attempts = 300  # 30 segundos con intentos cada 0.1s
+                    max_attempts = 300  # 30s con polling cada 0.1s
                     attempts = 0
-                    
-                    while lock_file_path.exists() and attempts < max_attempts:
-                        time.sleep(0.1)
-                        attempts += 1
-                    
-                    if attempts >= max_attempts:
-                        logger.warning(f"⚠️ Lock file existe después de timeout, continuando de todos modos: {lock_file_path}")
-                    
-                    # Crear archivo de bloqueo
-                    lock_file_path.touch()
-                    logger.info(f"🔒 Lock file creado para ChromaDB (Windows): {lock_file_path}")
+                    acquired = False
+                    while attempts < max_attempts:
+                        try:
+                            fd = os.open(
+                                str(lock_file_path),
+                                os.O_CREAT | os.O_EXCL | os.O_WRONLY,
+                            )
+                            os.close(fd)
+                            acquired = True
+                            break
+                        except FileExistsError:
+                            time.sleep(0.1)
+                            attempts += 1
+
+                    if not acquired:
+                        logger.warning(
+                            f"⚠️ No se pudo adquirir lock atómico para ChromaDB tras "
+                            f"{max_attempts * 0.1:.0f}s: {lock_file_path}. "
+                            "Otro proceso puede estar usándolo o el lock quedó huérfano."
+                        )
+                    else:
+                        logger.info(
+                            f"🔒 Lock atómico obtenido para ChromaDB (Windows): {lock_file_path}"
+                        )
             
             logger.info(f"📦 Creando nuevo cliente ChromaDB para: {persist_directory}")
             

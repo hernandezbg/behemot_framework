@@ -1,0 +1,33 @@
+# Asistente con conector de Telegram.
+# Variables sensibles en .env:
+#   TELEGRAM_TOKEN=123:ABC...
+#   TELEGRAM_WEBHOOK_URL=https://tu-dominio.com/webhook
+#   TELEGRAM_WEBHOOK_SECRET=<aleatorio_seguro>   # opcional pero recomendado en multi-réplica
+#   GPT_API_KEY=sk-...
+
+ASSISTANT_NAME: "AsistenteTelegram"
+ASSISTANT_DESCRIPTION: "Bot de Telegram con Behemot."
+
+MODEL_PROVIDER: "openai"
+MODEL_NAME: "gpt-4o-mini"
+MODEL_TEMPERATURE: 0.6
+MODEL_MAX_TOKENS: 600
+
+PROMPT_SISTEMA: |
+  Eres un asistente conversacional para Telegram. Responde de forma
+  clara y breve (los chats de Telegram favorecen mensajes cortos).
+  Usa formato Markdown discreto cuando ayude.
+
+SAFETY_LEVEL: "medium"
+
+# --- Permisos administrativos ---
+# Sustituye por tu user_id real (obtenlo enviando /start a tu bot y mirando
+# los logs, o ejecutando &whoami en el chat con el bot).
+ADMIN_MODE: "production"
+ADMIN_USERS:
+  - user_id: "123456789"
+    platform: "telegram"
+    permissions: ["super_admin"]
+
+ENABLE_VOICE: true        # Transcribe audios entrantes con Whisper
+ENABLE_RAG: false

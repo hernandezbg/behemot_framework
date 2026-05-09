@@ -1,16 +1,51 @@
 # app/routes/status.py
+import hmac
 import os
+import re
 import time
 import logging
 from datetime import datetime
 from typing import Dict, Any
 
-from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
 from behemot_framework.config import Config
 from behemot_framework.tooling import get_tool_definitions
+
+# Cualquier variable cuyo nombre matchee esta regex no se incluye nunca en la
+# respuesta de /status (defensa en profundidad junto al enmascaramiento).
+_SENSITIVE_VAR_PATTERN = re.compile(
+    r"(KEY|SECRET|PASSWORD|TOKEN|CREDENTIAL|PRIVATE)", re.IGNORECASE
+)
+
+
+def _require_status_auth(request: Request) -> None:
+    """
+    Exige Bearer token si STATUS_API_TOKEN está configurado.
+
+    Si no hay token configurado, /status queda accesible — el operador es
+    responsable de protegerlo a nivel de red (firewall/proxy). Loguemos un
+    warning visible al servir la primera petición sin token.
+    """
+    expected = Config.get("STATUS_API_TOKEN", "") or ""
+    if not expected:
+        # No hay auth configurada; permitir pero advertir una vez.
+        if not getattr(_require_status_auth, "_warned", False):
+            logger.warning(
+                "STATUS_API_TOKEN no configurado: /status queda accesible sin "
+                "autenticación. Configúralo o restringe el endpoint a nivel de red."
+            )
+            _require_status_auth._warned = True
+        return
+
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing Bearer token")
+    received = auth_header[len("Bearer "):]
+    if not hmac.compare_digest(received, expected):
+        raise HTTPException(status_code=401, detail="Invalid token")
 
 # Variable global para almacenar la ruta de configuración
 CONFIG_PATH = None
@@ -245,21 +280,24 @@ def check_config() -> Dict[str, Any]:
             result["icon_class"] = "status-warning"
             result["error"] = f"Faltan configuraciones: {', '.join(missing_keys)}"
         
-        # Variables de entorno relevantes (filtradas y seguras)
+        # Variables de entorno relevantes (filtradas y seguras).
+        # Cualquier variable cuyo nombre matchee _SENSITIVE_VAR_PATTERN NO se
+        # expone en /status — solo se indica si está configurada o no, sin
+        # revelar ni siquiera los primeros/últimos caracteres del valor.
         relevant_prefixes = ["GPT_", "OPENAI_", "REDIS_", "TELEGRAM_", "RAG_", "GS_"]
-        
+
         for key, value in os.environ.items():
-            # Solo incluir variables relevantes
-            if any(key.startswith(prefix) for prefix in relevant_prefixes):
-                # Enmascarar API keys y datos sensibles
-                if "KEY" in key or "SECRET" in key or "PASSWORD" in key or "TOKEN" in key:
-                    if value and len(value) > 8:
-                        masked_value = value[:4] + "*" * (len(value) - 8) + value[-4:]
-                    else:
-                        masked_value = "***" if value else "No configurado"
-                    result["env_vars"][key] = masked_value
+            if not any(key.startswith(prefix) for prefix in relevant_prefixes):
+                continue
+
+            if _SENSITIVE_VAR_PATTERN.search(key):
+                # Solo indicar si está configurada; nunca el valor ni un prefijo.
+                result["env_vars"][key] = "<configured>" if value else "<not set>"
+            else:
+                if value and len(value) > 50:
+                    result["env_vars"][key] = value[:50] + "..."
                 else:
-                    result["env_vars"][key] = value[:50] + "..." if value and len(value) > 50 else value
+                    result["env_vars"][key] = value
     
     except Exception as e:
         result["status"] = "Error"
@@ -349,7 +387,7 @@ def check_model() -> Dict[str, Any]:
         result["temperature"] = config.get("MODEL_TEMPERATURE", 0.7)
         result["max_tokens"] = config.get("MODEL_MAX_TOKENS", 150)
         
-        # Verificar API key
+        # Verificar API key (sin revelar ningún carácter del valor).
         api_key = config.get("GPT_API_KEY", "")
         if not api_key:
             result["status"] = "API Key faltante"
@@ -362,8 +400,8 @@ def check_model() -> Dict[str, Any]:
             result["icon"] = "⚠️"
             result["icon_class"] = "status-warning"
         else:
-            # Enmascarar la API key
-            result["api_key_status"] = f"{''*(len(api_key)-8)}{api_key[-4:]}" if len(api_key) > 8 else "Configurada"
+            # No exponer prefijos/sufijos del secreto: revelan entropía del token.
+            result["api_key_status"] = "Configurada"
     
     except Exception as e:
         result["status"] = "Error"
@@ -422,9 +460,26 @@ def determine_overall_status(checks: Dict[str, Dict[str, Any]]) -> Dict[str, Any
             "class": "status-ok"
         }
 
+@router.get("/health")
+async def get_health() -> JSONResponse:
+    """Endpoint público y minimalista para health-checks de orquestador.
+
+    No expone configuración ni estado interno — útil para Kubernetes /
+    Cloud Run / load balancers sin tener que abrir /status.
+    """
+    return JSONResponse({"status": "ok"})
+
+
 @router.get("/status", response_class=HTMLResponse)
 async def get_status(request: Request):
-    """Endpoint para mostrar el estado del framework Behemot"""
+    """Endpoint para mostrar el estado del framework Behemot.
+
+    Protegido con Bearer token si STATUS_API_TOKEN está definido. Sin token
+    configurado el endpoint queda accesible (con warning); en producción debe
+    configurarse el token o cerrarse el endpoint a nivel de red.
+    """
+    _require_status_auth(request)
+
     start_time = time.time()
     
     # Asegurar que los templates estén inicializados

@@ -1,0 +1,34 @@
+# Asistente expuesto vía API REST (POST /api/chat).
+# Variables sensibles en .env:
+#   GPT_API_KEY=sk-...
+#   API_KEYS=clave-cliente-1,clave-cliente-2     # claves que aceptará el endpoint
+
+ASSISTANT_NAME: "AsistenteAPI"
+ASSISTANT_DESCRIPTION: "Endpoint REST con auth y rate limiting."
+
+MODEL_PROVIDER: "openai"
+MODEL_NAME: "gpt-4o-mini"
+MODEL_TEMPERATURE: 0.5
+MODEL_MAX_TOKENS: 800
+
+PROMPT_SISTEMA: |
+  Eres un asistente accesible vía API. Tus respuestas las consume otra
+  aplicación, así que sé conciso, estructura la respuesta cuando
+  aporte (listas, bloques de código) y evita decoración innecesaria.
+
+SAFETY_LEVEL: "medium"
+
+# --- Seguridad de la API ---
+API_AUTH_MODE: "api_key"          # Exige header X-API-Key
+# API_KEYS se lee desde .env (lista separada por comas)
+
+# Rate limiting in-memory por IP. Para multi-réplica considera mover esto a Redis.
+API_RATE_LIMIT_PER_MINUTE: 60
+API_MAX_REQUEST_SIZE: 10485760    # 10 MB
+API_MAX_AUDIO_SIZE: 26214400      # 25 MB
+
+ADMIN_MODE: "production"
+# Sin admins: el endpoint público no expone comandos & — solo conversación.
+
+ENABLE_VOICE: false
+ENABLE_RAG: false

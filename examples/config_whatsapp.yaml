@@ -1,0 +1,34 @@
+# Asistente con conector de WhatsApp Business (Meta Cloud API).
+# Variables sensibles en .env:
+#   WHATSAPP_TOKEN=EAAG...                # Token de la Cloud API
+#   WHATSAPP_PHONE_ID=1234567890          # Phone Number ID
+#   WHATSAPP_VERIFY_TOKEN=...             # Token de verificación que tú eliges
+#   WHATSAPP_APP_SECRET=...               # ⚠️ App Secret de Meta (firma HMAC)
+#   WHATSAPP_WEBHOOK_URL=https://tu-dominio.com/whatsapp-webhook
+#   GPT_API_KEY=sk-...
+
+ASSISTANT_NAME: "AsistenteWhatsApp"
+ASSISTANT_DESCRIPTION: "Bot de WhatsApp con Behemot."
+
+MODEL_PROVIDER: "openai"
+MODEL_NAME: "gpt-4o-mini"
+MODEL_TEMPERATURE: 0.6
+MODEL_MAX_TOKENS: 700
+
+PROMPT_SISTEMA: |
+  Eres un asistente conversacional para WhatsApp. Responde de forma
+  natural y cercana, evitando bloques largos de texto: en WhatsApp
+  los mensajes cortos funcionan mejor.
+  Si necesitas dividir tu respuesta, usa "\n---SPLIT_MESSAGE---\n"
+  entre cada parte.
+
+SAFETY_LEVEL: "medium"
+
+ADMIN_MODE: "production"
+ADMIN_USERS:
+  - user_id: "+34611223344"        # Número en formato E.164
+    platform: "whatsapp"
+    permissions: ["super_admin"]
+
+ENABLE_VOICE: true
+ENABLE_RAG: false

@@ -3,6 +3,20 @@ from functools import wraps
 from typing import Callable, Dict, Any, List
 import json
 import asyncio
+import logging
+
+logger = logging.getLogger(__name__)
+
+# jsonschema es opcional: si está disponible validamos los argumentos del LLM
+# contra el schema declarado en el decorador @tool antes de ejecutar el handler.
+# Esto cierra una vía de tool poisoning detectada en la auditoría: un LLM
+# secuestrado por prompt injection podía llamar tools con argumentos fuera de
+# spec y el handler los recibía sin validar.
+try:
+    from jsonschema import validate as _jsonschema_validate, ValidationError as _JsonSchemaError
+    _JSONSCHEMA_AVAILABLE = True
+except Exception:  # pragma: no cover
+    _JSONSCHEMA_AVAILABLE = False
 
 
 # Variable global para registrar callbacks de herramientas
@@ -69,28 +83,53 @@ def get_tool_definitions() -> List[Dict[str, Any]]:
 async def call_tool(name: str, arguments: str, auto_response: bool = True) -> str:
     """
     Llama a la herramienta registrada de forma asíncrona.
-    Si la función es asíncrona, awaita su resultado; de lo contrario, la ejecuta y devuelve el valor.
+    Si la función es asíncrona, awaita su resultado; de lo contrario, la
+    ejecuta y devuelve el valor.
+
+    Antes de invocar el handler, valida `arguments` contra el JSON Schema
+    declarado al registrar la tool. Argumentos inválidos se rechazan sin
+    ejecutar la tool — esto evita tool poisoning vía prompt injection.
     """
     try:
-        args = json.loads(arguments)
-    except Exception:
-        args = {}
+        args = json.loads(arguments) if arguments else {}
+    except Exception as e:
+        logger.warning(f"[tool:{name}] argumentos no son JSON válido: {e}")
+        return f"Error: argumentos para '{name}' no son JSON válido"
 
+    if name not in TOOL_REGISTRY:
+        return f"No se encontró la herramienta: {name}"
 
-    if name in TOOL_REGISTRY:
-        handler = TOOL_REGISTRY[name]["handler"]
-        result = handler(args)
-        if asyncio.iscoroutine(result):
-            result = await result
-        
-        # Si hay un callback registrado para esta herramienta, ejecútalo
-        if auto_response and name in TOOL_CALLBACKS:
-            callback = TOOL_CALLBACKS[name]
-            await callback(name, args, result)
+    tool_info = TOOL_REGISTRY[name]
 
+    # Validación de argumentos contra el schema declarado.
+    if _JSONSCHEMA_AVAILABLE:
+        try:
+            _jsonschema_validate(instance=args, schema=tool_info["parameters"])
+        except _JsonSchemaError as e:
+            logger.warning(
+                f"[tool:{name}] argumentos rechazados por schema: {e.message}"
+            )
+            # Devolver al LLM un error estructurado: corregirá la siguiente llamada.
+            return (
+                f"Error: los argumentos para '{name}' no cumplen el schema. "
+                f"Detalle: {e.message}"
+            )
+    else:
+        logger.debug(
+            "jsonschema no instalado — validación de argumentos de tools deshabilitada"
+        )
 
-        return result
-    return f"No se encontró la herramienta: {name}"
+    handler = tool_info["handler"]
+    result = handler(args)
+    if asyncio.iscoroutine(result):
+        result = await result
+
+    # Si hay un callback registrado para esta herramienta, ejecútalo
+    if auto_response and name in TOOL_CALLBACKS:
+        callback = TOOL_CALLBACKS[name]
+        await callback(name, args, result)
+
+    return result
 
 
 def get_tool_handler(name: str) -> Callable:
