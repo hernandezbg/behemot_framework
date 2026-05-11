@@ -156,61 +156,50 @@ class GradioConnector:
         Returns:
             Interfaz Gradio configurada
         """
-        with gr.Blocks(
-            title="Behemot Framework - Test Local", 
-            theme=gr.themes.Soft(
-                primary_hue="green",
-                neutral_hue="slate",
-                text_size="md",
-                spacing_size="md"
-            ).set(
-                body_background_fill="*neutral_900",
-                body_background_fill_dark="*neutral_900",
-                block_background_fill="*neutral_800",
-                block_background_fill_dark="*neutral_800",
-                block_border_color="*neutral_700",
-                block_border_color_dark="*neutral_700",
-                input_background_fill="*neutral_700",
-                input_background_fill_dark="*neutral_700",
-                button_primary_background_fill="*primary_600",
-                button_primary_background_fill_dark="*primary_600",
-                button_primary_background_fill_hover="*primary_500",
-                button_primary_background_fill_hover_dark="*primary_500"
-            )
-        ) as interface:
+        # Gradio 6.x pide que `theme` se pase al .launch(), no al constructor.
+        # Lo guardamos como atributo de instancia para usarlo en launch().
+        self._theme = gr.themes.Soft(
+            primary_hue="green",
+            neutral_hue="slate",
+            text_size="md",
+            spacing_size="md",
+        )
+
+        with gr.Blocks(title="Behemot Framework - Test Local") as interface:
             gr.Markdown("# 🤖 Behemot Framework - Interfaz de Prueba Local")
             gr.Markdown("Prueba tu asistente de forma interactiva antes de desplegarlo.")
-            
+
+            # Definimos los widgets fuera de los Tabs para que los event
+            # handlers puedan referenciarlos sin problemas de contexto.
             with gr.Tab("💬 Chat"):
                 chatbot = gr.Chatbot(
                     label="Conversación",
                     height=400,
                     show_label=True,
-                    container=True
+                    container=True,
                 )
-                
+
                 with gr.Row():
                     msg = gr.Textbox(
                         label="Mensaje",
                         placeholder="Escribe tu mensaje aquí...",
                         lines=2,
-                        scale=4
+                        scale=4,
                     )
                     submit = gr.Button("Enviar", variant="primary", scale=1)
-                
+
                 # Audio input (si está habilitado)
+                audio = None
                 if self.transcriptor:
                     with gr.Row():
                         audio = gr.Audio(
                             sources=["microphone", "upload"],
                             type="filepath",
-                            label="🎤 Mensaje de voz (opcional)"
+                            label="🎤 Mensaje de voz (opcional)",
                         )
-                
-                # Clear button
+
                 clear = gr.Button("🗑️ Limpiar conversación", variant="secondary")
-                
-                # Ejemplos
+
                 gr.Examples(
                     examples=[
                         "Hola, ¿cómo estás?",
@@ -218,58 +207,59 @@ class GradioConnector:
                         "¿Cuál es tu propósito?",
                     ],
                     inputs=msg,
-                    label="Ejemplos de mensajes"
+                    label="Ejemplos de mensajes",
                 )
-                
+
+                # Event handlers dentro del Tab activo: garantiza que el
+                # contexto de Blocks siga abierto al registrar los callbacks
+                # (Gradio 6.x es estricto con esto).
+                submit.click(
+                    fn=self.process_message,
+                    inputs=[msg, chatbot],
+                    outputs=[msg, chatbot],
+                    queue=False,
+                )
+                msg.submit(
+                    fn=self.process_message,
+                    inputs=[msg, chatbot],
+                    outputs=[msg, chatbot],
+                    queue=False,
+                )
+                if audio is not None:
+                    audio.change(
+                        fn=self.process_audio,
+                        inputs=[audio, chatbot],
+                        outputs=[audio, msg, chatbot],
+                        queue=False,
+                    )
+                clear.click(lambda: ([], ""), outputs=[chatbot, msg], queue=False)
+
             with gr.Tab("🔧 Herramientas"):
-                tools_info = gr.Markdown(self.get_tools_info())
-                
+                gr.Markdown(self.get_tools_info())
+
             with gr.Tab("⚙️ Configuración"):
-                config_info = gr.Markdown(self.get_config_info())
-                
+                gr.Markdown(self.get_config_info())
+
             with gr.Tab("📖 Ayuda"):
-                gr.Markdown("""
-                ### 🚀 Cómo usar esta interfaz:
-                
-                1. **Chat**: Escribe mensajes o graba audio para interactuar con el asistente
-                2. **Herramientas**: Ve las herramientas disponibles para el asistente
-                3. **Configuración**: Revisa la configuración actual del sistema
-                
-                ### 🎯 Tips:
-                - Prueba las herramientas disponibles pidiendo al asistente que las use
-                - Si RAG está habilitado, pregunta sobre tus documentos
-                - Los mensajes de voz se transcriben automáticamente (si está habilitado)
-                
-                ### ⚠️ Nota:
-                Esta es una interfaz de prueba local. Para producción, usa los conectores
-                de Telegram, WhatsApp, Google Chat o API REST.
-                """)
-            
-            # Event handlers
-            submit_event = submit.click(
-                fn=self.process_message,
-                inputs=[msg, chatbot],
-                outputs=[msg, chatbot],
-                queue=False
-            )
-            
-            msg.submit(
-                fn=self.process_message,
-                inputs=[msg, chatbot],
-                outputs=[msg, chatbot],
-                queue=False
-            )
-            
-            if self.transcriptor:
-                audio.change(
-                    fn=self.process_audio,
-                    inputs=[audio, chatbot],
-                    outputs=[audio, msg, chatbot],
-                    queue=False
+                gr.Markdown(
+                    """
+                    ### 🚀 Cómo usar esta interfaz:
+
+                    1. **Chat**: Escribe mensajes o graba audio para interactuar con el asistente
+                    2. **Herramientas**: Ve las herramientas disponibles para el asistente
+                    3. **Configuración**: Revisa la configuración actual del sistema
+
+                    ### 🎯 Tips:
+                    - Prueba las herramientas disponibles pidiendo al asistente que las use
+                    - Si RAG está habilitado, pregunta sobre tus documentos
+                    - Los mensajes de voz se transcriben automáticamente (si está habilitado)
+
+                    ### ⚠️ Nota:
+                    Esta es una interfaz de prueba local. Para producción, usa los conectores
+                    de Telegram, WhatsApp, Google Chat o API REST.
+                    """
                 )
-            
-            clear.click(lambda: ([], ""), outputs=[chatbot, msg], queue=False)
-            
+
         return interface
     
     def launch(self, port: int = 7860, share: bool = None):
