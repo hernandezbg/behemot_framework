@@ -66,26 +66,41 @@ class ModelFactory:
         
         model_class = cls._models[provider]
         
-        # Obtener API key según el proveedor
+        # Obtener API key según el proveedor.
+        # Vertex AI es un caso especial: NO usa API key, autentica con
+        # Application Default Credentials (cuenta de servicio de Cloud Run,
+        # `gcloud auth application-default login` en local, etc.). Solo
+        # requiere VERTEX_PROJECT_ID, que el propio VertexModel valida.
         if api_key is None:
-            # Mapeo de proveedores a sus variables de API key
             api_key_mapping = {
                 "openai": "GPT_API_KEY",
                 "gpt": "GPT_API_KEY",
                 "gemini": "GEMINI_API_KEY",
-                "vertex": "VERTEX_API_KEY",
                 "anthropic": "ANTHROPIC_API_KEY",
             }
-            
-            api_key_var = api_key_mapping.get(provider, f"{provider.upper()}_API_KEY")
-            api_key = config.get(api_key_var)
-            
-            if not api_key:
-                raise ValueError(
-                    f"No se encontró la API key para {provider}. "
-                    f"Asegúrate de configurar {api_key_var} en el archivo .env"
-                )
-        
+
+            if provider == "vertex":
+                # No exigir API key. Validar VERTEX_PROJECT_ID está presente
+                # — sin él, Vertex no puede inicializar y la cuenta de servicio
+                # no resuelve nada.
+                if not config.get("VERTEX_PROJECT_ID"):
+                    raise ValueError(
+                        "VERTEX_PROJECT_ID es obligatorio para usar Vertex AI. "
+                        "Defínelo en tu config YAML o como variable de entorno. "
+                        "La autenticación usa ADC (Application Default Credentials), "
+                        "no API key."
+                    )
+                api_key = None  # explícito: VertexModel lo ignora
+            else:
+                api_key_var = api_key_mapping.get(provider, f"{provider.upper()}_API_KEY")
+                api_key = config.get(api_key_var)
+
+                if not api_key:
+                    raise ValueError(
+                        f"No se encontró la API key para {provider}. "
+                        f"Asegúrate de configurar {api_key_var} en el archivo .env"
+                    )
+
         # Crear y retornar la instancia del modelo
         logger.info(f"Creando modelo: {provider}")
         return model_class(api_key)
