@@ -12,7 +12,10 @@ import os
 import glob
 from typing import List, Dict, Any, Optional
 from fastapi import FastAPI
-from google.cloud import storage
+
+# `google.cloud.storage` se importa de forma perezosa dentro de las funciones
+# que lo necesitan (ingesta desde GCS). Mantenerlo opcional permite usar el
+# framework sin la extra `[cloud]` instalada.
 
 
 

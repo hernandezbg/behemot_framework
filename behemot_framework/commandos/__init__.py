@@ -19,8 +19,14 @@ from behemot_framework.commandos.system_status import (
 import behemot_framework.commandos.system_monitor
 from . import session_analyzer
 
-# Importar comandos RAG
-from . import rag_commands
+# Importar comandos RAG (opcional: requiere extras [rag])
+try:
+    from . import rag_commands  # noqa: F401
+except ImportError as _e:
+    import logging as _logging
+    _logging.getLogger(__name__).info(
+        "Comandos RAG no disponibles (extras [rag] no instaladas): %s", _e
+    )
 
 # Importar comandos definidos
 from behemot_framework.commandos.command_handler import (

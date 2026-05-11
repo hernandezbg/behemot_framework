@@ -12,6 +12,7 @@ CORE_REQUIRES = [
     "pydantic>=2",
     "openai",
     "redis",
+    "PyYAML",             # config.py carga YAML
     "python-multipart",   # uploads en /api/chat
     "jsonschema",         # validación de argumentos de tools (seguridad)
     "beautifulsoup4",     # sanitización HTML en RAG (seguridad)
@@ -82,7 +83,7 @@ with open("README.md", encoding="utf-8") as f:
 
 setup(
     name="behemot_framework",
-    version="0.3.0",
+    version="0.3.2",
     packages=find_packages(),
     install_requires=CORE_REQUIRES,
     extras_require=EXTRAS,

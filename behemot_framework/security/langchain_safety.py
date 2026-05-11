@@ -1,38 +1,57 @@
 # app/security/langchain_safety.py
-from langchain_openai import OpenAI, ChatOpenAI
-from langchain_core.prompts import PromptTemplate
-from langchain_core.output_parsers import StrOutputParser
-# Actualizar importación de pydantic (corregir advertencia de deprecación)
-from pydantic import BaseModel, Field
 import logging
+from pydantic import BaseModel, Field
+
+# Las dependencias de langchain se importan de forma perezosa cuando se crea
+# realmente un filtro con nivel != "off". Esto permite que el paquete core
+# (incluido este módulo) se importe sin tener langchain instalado: los usuarios
+# que quieran el filtro deben instalar `behemot-framework[rag]`.
 
 logger = logging.getLogger(__name__)
 
+
 class LangChainSafetyFilter:
     """
-    Filtro de seguridad utilizando componentes de LangChain
+    Filtro de seguridad utilizando componentes de LangChain.
+
+    Requiere las extras [rag] de behemot-framework para estar activado. Si
+    SAFETY_LEVEL = "off" se puede instanciar sin langchain.
     """
-    
+
     def __init__(self, api_key, safety_level="medium"):
         self.api_key = api_key
         self.safety_level = safety_level
-        
-        # Si está deshabilitado, no inicializar LLM
+
         if safety_level.lower() == "off":
             self.llm = None
             self.sensitivity = None
             logger.info("🔓 Filtro de seguridad DESHABILITADO (SAFETY_LEVEL: off)")
-        else:
-            self.llm = ChatOpenAI(
-                api_key=api_key, 
-                model="gpt-3.5-turbo",
-                temperature=0,
-                max_tokens=150
+            return
+
+        # Lazy import: solo necesitamos langchain cuando el filtro está activo.
+        try:
+            from langchain_openai import ChatOpenAI
+        except ImportError as e:
+            logger.warning(
+                "⚠️  SAFETY_LEVEL='%s' pero langchain-openai no está instalado. "
+                "Instala 'behemot-framework[rag]' o define SAFETY_LEVEL=off. "
+                "Filtro de seguridad DESACTIVADO. (%s)",
+                safety_level, e,
             )
-            
-            # Configura la sensibilidad según el nivel de seguridad
-            self.setup_safety_settings()
-            logger.info(f"🛡️ Filtro de seguridad ACTIVADO (nivel: {safety_level})")
+            self.llm = None
+            self.sensitivity = None
+            return
+
+        self.llm = ChatOpenAI(
+            api_key=api_key,
+            model="gpt-3.5-turbo",
+            temperature=0,
+            max_tokens=150,
+        )
+
+        # Configura la sensibilidad según el nivel de seguridad
+        self.setup_safety_settings()
+        logger.info(f"🛡️ Filtro de seguridad ACTIVADO (nivel: {safety_level})")
     
     def setup_safety_settings(self):
         """Configura los ajustes de seguridad según el nivel seleccionado"""
@@ -81,12 +100,7 @@ SAFE
 UNSAFE: [razón específica]
         """
         
-        safety_prompt = PromptTemplate.from_template(safety_template)
-        
-        # Crear la cadena para evaluación de seguridad
-        safety_chain = safety_prompt | self.llm | StrOutputParser()
-        
-        # Si el filtro está deshabilitado, permitir todo
+        # Si el filtro está deshabilitado, permitir todo (sin importar langchain)
         if self.safety_level.lower() == "off" or self.llm is None:
             logger.debug(f"Filtro de seguridad omitido (deshabilitado) para: '{content[:50]}...'")
             return {
@@ -96,6 +110,13 @@ UNSAFE: [razón específica]
             }
         
         try:
+            # Lazy import: solo cuando realmente invocamos el filtro
+            from langchain_core.prompts import PromptTemplate
+            from langchain_core.output_parsers import StrOutputParser
+
+            safety_prompt = PromptTemplate.from_template(safety_template)
+            safety_chain = safety_prompt | self.llm | StrOutputParser()
+
             logger.info(f"🔍 Evaluando seguridad (nivel {self.safety_level}) para: '{content[:50]}...'")
             result = await safety_chain.ainvoke({
                 "content": content,
