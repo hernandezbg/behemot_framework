@@ -20,6 +20,25 @@ source venv/bin/activate  # Windows: venv\Scripts\activate
 
 ### Paso 2: Instalar Behemot Framework
 
+Instala solo el core (modelos OpenAI + API REST):
+
+```bash
+pip install behemot-framework
+```
+
+O añade los extras que necesites:
+
+```bash
+pip install "behemot-framework[rag]"          # Retrieval-Augmented Generation
+pip install "behemot-framework[voice]"        # Transcripción Whisper
+pip install "behemot-framework[gemini]"       # Google Gemini
+pip install "behemot-framework[gradio]"       # Interfaz local de pruebas
+pip install "behemot-framework[rag,voice,gradio]"   # Combinables
+pip install "behemot-framework[all]"          # Todo
+```
+
+También puedes instalar desde el repositorio (siempre la última versión):
+
 ```bash
 pip install git+https://github.com/hernandezbg/behemot_framework.git
 ```
