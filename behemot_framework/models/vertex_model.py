@@ -59,7 +59,11 @@ class VertexModel(BaseModel):
             
         except ImportError as e:
             logger.error(f"Error importando librerías de Vertex AI: {e}")
-            raise ImportError("Para usar Vertex AI, instala: pip install google-cloud-aiplatform")
+            raise ImportError(
+                "Para usar Vertex AI instala la extra correspondiente:\n"
+                "    pip install 'behemot-framework[vertex]'\n"
+                "o directamente:  pip install google-cloud-aiplatform"
+            )
         except Exception as e:
             logger.error(f"Error inicializando Vertex AI: {e}")
             raise

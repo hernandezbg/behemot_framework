@@ -54,6 +54,12 @@ EXTRAS = {
         "google-auth==2.28.1",
         "boto3",
     ],
+    "vertex": [
+        # Vertex AI (Gemini en GCP, autenticación con ADC / cuenta de servicio).
+        # Trae también `vertexai` y `google-cloud-aiplatform`.
+        "google-cloud-aiplatform>=1.40.0",
+        "Pillow",  # vertex_model.py importa PIL para imágenes
+    ],
     "telegram": [
         "python-telegram-bot",
     ],
@@ -83,7 +89,7 @@ with open("README.md", encoding="utf-8") as f:
 
 setup(
     name="behemot_framework",
-    version="0.3.3",
+    version="0.3.4",
     packages=find_packages(),
     install_requires=CORE_REQUIRES,
     extras_require=EXTRAS,
