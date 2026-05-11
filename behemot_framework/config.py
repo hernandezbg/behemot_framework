@@ -148,7 +148,11 @@ class Config:
             # del header X-Hub-Signature-256 en webhooks de WhatsApp Cloud API.
             "WHATSAPP_APP_SECRET": os.getenv("WHATSAPP_APP_SECRET", ""),
             "API_WEBHOOK_URL": os.getenv("API_WEBHOOK_URL", ""),
-            "ENABLE_VOICE": os.getenv("ENABLE_VOICE", "true").lower() in ("true", "1", "yes"),
+            # Por seguridad/UX el default es false: voice requiere GPT_API_KEY
+            # (Whisper de OpenAI) y romper el arranque cuando el usuario usa
+            # otro provider es desagradable. Quien lo necesite lo activa
+            # explícitamente en su YAML o con enable_voice=True.
+            "ENABLE_VOICE": os.getenv("ENABLE_VOICE", "false").lower() in ("true", "1", "yes"),
             
             # Configuración de Redis para persistencia
             "REDIS_PUBLIC_URL": os.getenv("REDIS_PUBLIC_URL", ""),

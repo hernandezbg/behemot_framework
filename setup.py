@@ -89,7 +89,7 @@ with open("README.md", encoding="utf-8") as f:
 
 setup(
     name="behemot_framework",
-    version="0.3.5",
+    version="0.3.6",
     packages=find_packages(),
     install_requires=CORE_REQUIRES,
     extras_require=EXTRAS,

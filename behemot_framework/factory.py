@@ -1068,10 +1068,16 @@ def create_behemot_app(
 
     # Almacenar la ruta de configuración en la propia configuración para acceso posterior
     config["_config_path"] = config_path
-    
+
+    # Las flags explícitas pasadas a create_behemot_app() tienen prioridad
+    # sobre el YAML: si el usuario llama con enable_voice=True/False, ese
+    # valor sobrescribe ENABLE_VOICE del config. Esto evita la sorpresa de
+    # que la flag de Python sea ignorada por un default heredado.
+    config["ENABLE_VOICE"] = bool(enable_voice)
+
     # Crear la app base
     app = FastAPI(title="Behemot Framework", description="Framework modular para asistentes IA")
-    
+
     # Inicializar factory con la configuración
     factory = BehemotFactory(config)
     
