@@ -63,6 +63,11 @@ EXTRAS = {
     "telegram": [
         "python-telegram-bot",
     ],
+    "google_chat": [
+        # Conector de Google Chat (autenticación con service account de GCP).
+        "google-api-python-client>=2.0.0",
+        "google-auth>=2.0.0",
+    ],
     "whatsapp": [
         "twilio",
     ],
@@ -89,7 +94,7 @@ with open("README.md", encoding="utf-8") as f:
 
 setup(
     name="behemot_framework",
-    version="0.4.0",
+    version="0.4.1",
     packages=find_packages(),
     install_requires=CORE_REQUIRES,
     extras_require=EXTRAS,
