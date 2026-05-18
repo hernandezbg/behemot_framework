@@ -154,8 +154,11 @@ class Config:
             # explícitamente en su YAML o con enable_voice=True.
             "ENABLE_VOICE": os.getenv("ENABLE_VOICE", "false").lower() in ("true", "1", "yes"),
             
-            # Configuración de Redis para persistencia
-            "REDIS_PUBLIC_URL": os.getenv("REDIS_PUBLIC_URL", ""),
+            # Configuración de Redis para persistencia. Aceptamos también
+            # REDIS_URL como fallback porque muchas plataformas
+            # (Railway, Render, Heroku) inyectan ese nombre por convención.
+            # REDIS_PUBLIC_URL tiene prioridad si ambas están definidas.
+            "REDIS_PUBLIC_URL": os.getenv("REDIS_PUBLIC_URL", "") or os.getenv("REDIS_URL", ""),
             
             # Configuración de seguridad
             "SAFETY_LEVEL": os.getenv("SAFETY_LEVEL", "medium"),  # low, medium, high

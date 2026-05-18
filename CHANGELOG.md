@@ -2,6 +2,36 @@
 
 Todas las mejoras y cambios importantes de Behemot Framework se documentan en este archivo.
 
+## [0.5.1] - 2026-05-18
+
+### 🐛 Fix crítico: Redis inalcanzable colgaba el arranque
+
+`behemot_framework/context.py` ejecutaba `redis_client.ping()` al
+importarse el módulo, **sin timeout**. Si `REDIS_PUBLIC_URL` apuntaba a
+un endpoint inalcanzable (firewall, TLS mal configurado, servicio
+pausado), el proceso quedaba bloqueado indefinidamente antes de que
+Uvicorn pudiera abrir el puerto, lo que se manifestaba en plataformas
+como Railway como un *healthcheck failed* sin ningún log de aplicación.
+
+**Fix:** se agregaron `socket_connect_timeout=5` y `socket_timeout=5` al
+constructor de `redis.from_url(...)`. Ahora, si Redis no responde, el
+ping falla en 5 s con un mensaje claro y la app **continúa sin
+persistencia de contexto** en vez de colgarse.
+
+### ✨ Aceptar `REDIS_URL` como fallback
+
+Railway, Render y Heroku inyectan la URL de Redis bajo el nombre
+`REDIS_URL` por convención. Behemot ahora la acepta como fallback de
+`REDIS_PUBLIC_URL` (que sigue teniendo prioridad si ambas están
+definidas). Esto elimina la fricción común de tener que crear una env
+var con un nombre distinto al que la plataforma provee.
+
+### 🧹 Saneamiento de la URL de Redis
+
+La URL se pasa por `.strip()` y se quitan comillas envolventes (`"..."` o
+`'...'`) si aparecen — protección contra el caso típico de pegar la URL
+con comillas en el panel de configuración de la plataforma.
+
 ## [0.5.0] - 2026-05-18
 
 ### ⚠️ Breaking changes — empaquetado del extra `[rag]`
