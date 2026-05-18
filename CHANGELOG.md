@@ -2,6 +2,75 @@
 
 Todas las mejoras y cambios importantes de Behemot Framework se documentan en este archivo.
 
+## [0.5.0] - 2026-05-18
+
+### ⚠️ Breaking changes — empaquetado del extra `[rag]`
+
+El extra `[rag]` deja de ser un bundle monolítico de ~3 GB y pasa a ser un
+slim core que solo incluye lo necesario para indexar texto y consultar
+ChromaDB con embeddings de OpenAI. Los loaders pesados y los backends de
+embeddings de HuggingFace pasan a extras opcionales.
+
+**Por qué:** la versión 0.4.x arrastraba `sentence-transformers` (→ torch,
+CUDA, transformers) y `unstructured` (→ spacy, nltk) aunque el usuario solo
+quisiera Markdown + OpenAI + ChromaDB. En despliegues como Railway/Render,
+la imagen Docker pesaba ~3 GB y el `pip install` tardaba >3 minutos.
+
+**Nuevo `[rag]` (slim, ~400-500 MB):**
+
+- `langchain-core`, `langchain-text-splitters`, `langchain-openai`
+- `langchain-chroma`, `chromadb`
+- `tiktoken`, `markdown`
+
+**Extras nuevos:**
+
+| Extra | Para qué | Pesa |
+|-------|----------|------|
+| `rag-loaders-pdf` | Cargar PDFs (`pypdf`) | ~5 MB |
+| `rag-loaders-office` | `.docx`, `.pptx`, `.eml` y mejor parseo de Markdown vía `unstructured` | ~500 MB (trae transformers) |
+| `rag-loaders-web` | `WebBaseLoader`, `TextLoader`, `CSVLoader`, `DirectoryLoader` (langchain-community) | ~10 MB |
+| `rag-embeddings-hf` | Embeddings locales con HuggingFace (`sentence-transformers`) | ~2.5 GB (trae torch + CUDA) |
+| `rag-full` | Bundle con el comportamiento de 0.4.x | ~3 GB |
+
+### Migración
+
+Caso por caso, el comando equivalente:
+
+| Tu caso | 0.4.x | 0.5.0 |
+|---------|-------|-------|
+| OpenAI + ChromaDB + Markdown local | `[rag]` | `[rag]` |
+| OpenAI + ChromaDB + PDF local | `[rag]` | `[rag,rag-loaders-pdf]` |
+| Google Gemini + GCS bucket | `[rag,gemini,cloud]` | `[rag,gemini,cloud,rag-loaders-pdf]` |
+| HuggingFace embeddings locales | `[rag]` | `[rag,rag-embeddings-hf]` |
+| Compatibilidad total con 0.4.x | `[rag]` | `[rag-full]` |
+
+### Cambios internos
+
+- `behemot_framework/rag/document_loader.py`: todos los loaders concretos
+  (PDF, CSV, Web, S3, GCS, Google Drive, UnstructuredMarkdown) ahora se
+  importan de forma perezosa. Si llamas un loader cuyo extra no instalaste,
+  recibes un `ImportError` con el comando `pip install` exacto.
+- `behemot_framework/rag/document_loader.py::load_markdown`: si
+  `unstructured` no está instalado, hace fallback a un parser ligero que
+  lee el `.md` como texto plano. Suficiente para el 95% de casos de RAG.
+- `behemot_framework/rag/embeddings.py`: `HuggingFaceEmbeddings` y los
+  embeddings de Google se importan de forma perezosa dentro de su método
+  correspondiente.
+- `behemot_framework/rag/rag_pipeline.py`: migrado de
+  `langchain_community.vectorstores.Chroma` a `langchain_chroma.Chroma`.
+- `behemot_framework/rag/retriever.py`: `ContextualCompressionRetriever` y
+  `LLMChainExtractor` (`langchain-classic`) se importan de forma perezosa
+  solo si llamas `get_compression_retriever`.
+- Removidas dependencias no usadas del extra `[rag]`: `faiss-cpu`,
+  `langchain-classic`, `langchain` (meta-paquete), `langchain-community`.
+
+### Impacto esperado
+
+- Tamaño de imagen Docker para caso OpenAI+ChromaDB+Markdown: **~3 GB → ~500 MB**.
+- Tiempo de `pip install` en CI sin cache: **~3 min → ~30 s**.
+- Errores `No module named 'googleapiclient' / 'boto3' / 'google.cloud'`
+  durante el arranque cuando no se usan esos backends: eliminados.
+
 ## [0.1.2] - 2025-01-03
 
 ### ✨ Nuevas Características

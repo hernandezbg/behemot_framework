@@ -21,26 +21,31 @@ else:
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 
+
+logger = logging.getLogger(__name__)
+
+
 # Intentar importar la versión nueva de Chroma primero
 try:
     from langchain_chroma import Chroma
 except ImportError:
-    # Si no está disponible, usar la versión legacy con warning suprimido
-    import warnings
-    with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", category=DeprecationWarning)
-        from langchain_community.vectorstores import Chroma
+    # Fallback a la versión legacy en langchain-community si está disponible.
+    try:
+        import warnings
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=DeprecationWarning)
+            from langchain_community.vectorstores import Chroma
+    except ImportError:
+        Chroma = None  # type: ignore[assignment]
+        logger.debug("Chroma no disponible (ni langchain-chroma ni langchain-community).")
 
-# Importar Redis vector store
+# Importar Redis vector store (opcional)
 try:
     from langchain_community.vectorstores import Redis as RedisVectorStore
     REDIS_AVAILABLE = True
 except ImportError:
     REDIS_AVAILABLE = False
-    logger.warning("Redis vector store no disponible. Instale redis-py para usar Redis como almacenamiento de vectores.")
-
-
-logger = logging.getLogger(__name__)
+    logger.debug("Redis vector store no disponible. Instala langchain-community para usar Redis.")
 
 
 class ChromaClientManager:

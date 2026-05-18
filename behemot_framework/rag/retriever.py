@@ -6,9 +6,10 @@ Módulo para implementar retrievers para el sistema RAG
 from typing import List, Dict, Any, Optional, Union
 import logging
 
-from langchain_classic.retrievers import ContextualCompressionRetriever
-from langchain_classic.retrievers.document_compressors import LLMChainExtractor
-from langchain_community.vectorstores import Chroma
+# ContextualCompressionRetriever y LLMChainExtractor viven en
+# langchain-classic. Solo se importan dentro de
+# `get_compression_retriever` para no obligar a instalar langchain-classic
+# (y su árbol de dependencias) a usuarios que solo usan retrieval básico.
 from langchain_core.retrievers import BaseRetriever
 from langchain_core.documents import Document
 from langchain_core.language_models import BaseLanguageModel
@@ -22,7 +23,7 @@ class RAGRetriever:
 
     @staticmethod
     def get_vectorstore_retriever(
-        vectorstore: Chroma,
+        vectorstore: Any,
         search_type: str = "similarity",
         search_kwargs: Optional[Dict[str, Any]] = None,
     ) -> BaseRetriever:
@@ -48,21 +49,31 @@ class RAGRetriever:
     def get_compression_retriever(
         base_retriever: BaseRetriever,
         llm: BaseLanguageModel,
-    ) -> ContextualCompressionRetriever:
+    ) -> Any:
         """
         Crea un retriever con compresión contextual
-        
+
         Args:
             base_retriever: Retriever base a mejorar
             llm: Modelo de lenguaje para la compresión
-            
+
         Returns:
             Retriever con compresión
         """
+        try:
+            from langchain_classic.retrievers import ContextualCompressionRetriever
+            from langchain_classic.retrievers.document_compressors import LLMChainExtractor
+        except ImportError as e:
+            raise ImportError(
+                "ContextualCompressionRetriever requiere langchain-classic. "
+                'Instala: pip install "behemot-framework[rag-full]" o '
+                'pip install langchain-classic'
+            ) from e
+
         logger.info("Configurando retriever con compresión contextual")
-        
+
         compressor = LLMChainExtractor.from_llm(llm)
-        
+
         return ContextualCompressionRetriever(
             base_compressor=compressor,
             base_retriever=base_retriever,

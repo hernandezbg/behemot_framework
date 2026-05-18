@@ -19,13 +19,57 @@ CORE_REQUIRES = [
 ]
 
 EXTRAS = {
+    # RAG base slim: chunking + ChromaDB + tiktoken. Embeddings y loaders
+    # opcionales se instalan vía extras adicionales (ver más abajo).
+    # Breaking change vs 0.4.x: ya no incluye sentence-transformers,
+    # unstructured, faiss-cpu ni langchain-classic. Para el comportamiento
+    # anterior, instalar [rag-full].
     "rag": [
+        "langchain-core>=0.1.0",
+        "langchain-text-splitters>=0.0.1",
+        "langchain-openai>=0.0.5",     # provider OpenAI por defecto
+        "langchain-chroma>=0.1.0",
+        "chromadb>=0.4.22",
+        "tiktoken>=0.5.1",
+        "markdown",                     # parseo .md sin unstructured
+    ],
+
+    # Loaders opcionales por formato/fuente.
+    # Todos arrastran langchain-community porque los loaders concretos
+    # (PyPDFLoader, CSVLoader, WebBaseLoader, UnstructuredMarkdownLoader,
+    # etc.) viven en ese paquete. langchain-community pesa ~10 MB; lo
+    # gordo (torch, transformers) viene solo si se pide [rag-loaders-office]
+    # o [rag-embeddings-hf].
+    "rag-loaders-pdf": [
+        "langchain-community>=0.0.13",
+        "pypdf>=3.17.1",
+    ],
+    "rag-loaders-office": [
+        # unstructured arrastra transitivamente transformers, nltk, etc.
+        # Solo instalar si se necesitan .docx/.pptx/.eml o el loader
+        # UnstructuredMarkdownLoader (no requerido para .md básico).
+        "langchain-community>=0.0.13",
+        "unstructured>=0.4.16",
+    ],
+    "rag-loaders-web": [
+        # WebBaseLoader, TextLoader, CSVLoader, DirectoryLoader.
+        "langchain-community>=0.0.13",
+    ],
+
+    # Embeddings opcionales. OpenAI ya viene en [rag].
+    "rag-embeddings-hf": [
+        # sentence-transformers arrastra torch + nvidia-* (~2.5 GB).
+        "sentence-transformers",
+        "langchain-community>=0.0.13",  # HuggingFaceEmbeddings vive aquí
+    ],
+
+    # Bundle con el comportamiento previo a 0.5.0 — facilita migración.
+    "rag-full": [
         "langchain>=0.1.0",
         "langchain-core>=0.1.0",
         "langchain-community>=0.0.13",
         "langchain-text-splitters>=0.0.1",
         "langchain-openai>=0.0.5",
-        "langchain-classic>=1.0.0",
         "langchain-chroma>=0.1.0",
         "chromadb>=0.4.22",
         "tiktoken>=0.5.1",
@@ -33,7 +77,6 @@ EXTRAS = {
         "unstructured>=0.4.16",
         "markdown",
         "sentence-transformers",
-        "faiss-cpu>=1.7.4",
     ],
     "voice": [
         "openai-whisper",
@@ -94,7 +137,7 @@ with open("README.md", encoding="utf-8") as f:
 
 setup(
     name="behemot_framework",
-    version="0.4.1",
+    version="0.5.0",
     packages=find_packages(),
     install_requires=CORE_REQUIRES,
     extras_require=EXTRAS,

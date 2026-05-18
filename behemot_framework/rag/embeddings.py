@@ -9,15 +9,11 @@ import logging
 import os
 
 from langchain_openai import OpenAIEmbeddings
-from langchain_community.embeddings import HuggingFaceEmbeddings
 
-# Importar embeddings de Google si están disponibles
-try:
-    import google.generativeai as genai
-    from langchain_google_genai import GoogleGenerativeAIEmbeddings
-    GOOGLE_EMBEDDINGS_AVAILABLE = True
-except ImportError:
-    GOOGLE_EMBEDDINGS_AVAILABLE = False
+# HuggingFaceEmbeddings y los embeddings de Google se importan de forma
+# perezosa dentro de las funciones que los usan. Esto evita arrastrar
+# langchain-community (HF) y google-generativeai cuando el usuario solo
+# necesita OpenAI.
 
 
 logger = logging.getLogger(__name__)
@@ -69,20 +65,28 @@ class EmbeddingManager:
         model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
         model_kwargs: Optional[Dict[str, Any]] = None,
         encode_kwargs: Optional[Dict[str, Any]] = None,
-    ) -> HuggingFaceEmbeddings:
+    ) -> Any:
         """
         Obtiene un modelo de embeddings de HuggingFace
-        
+
         Args:
             model_name: Nombre del modelo HuggingFace
             model_kwargs: Parámetros para la carga del modelo
             encode_kwargs: Parámetros para la codificación
-            
+
         Returns:
             Modelo de embeddings HuggingFace
         """
+        try:
+            from langchain_community.embeddings import HuggingFaceEmbeddings
+        except ImportError as e:
+            raise ImportError(
+                "HuggingFaceEmbeddings requiere paquetes opcionales. Instala: "
+                'pip install "behemot-framework[rag-embeddings-hf]"'
+            ) from e
+
         logger.info(f"Inicializando embeddings de HuggingFace: {model_name}")
-        
+
         return HuggingFaceEmbeddings(
             model_name=model_name,
             model_kwargs=model_kwargs or {"device": "cpu"},
@@ -104,12 +108,15 @@ class EmbeddingManager:
         Returns:
             Modelo de embeddings Google
         """
-        if not GOOGLE_EMBEDDINGS_AVAILABLE:
+        try:
+            import google.generativeai as genai
+            from langchain_google_genai import GoogleGenerativeAIEmbeddings
+        except ImportError as e:
             raise ImportError(
-                "google-generativeai y langchain-google-genai no están instalados. "
-                "Ejecuta: pip install google-generativeai langchain-google-genai"
-            )
-        
+                "Embeddings de Google requieren paquetes opcionales. Instala: "
+                'pip install "behemot-framework[gemini]"'
+            ) from e
+
         logger.info(f"Inicializando embeddings de Google: {model}")
         
         # Obtener API key de Gemini desde la configuración

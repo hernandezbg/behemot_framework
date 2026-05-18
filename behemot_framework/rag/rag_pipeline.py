@@ -11,7 +11,7 @@ import asyncio
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 from langchain_core.retrievers import BaseRetriever
-from langchain_community.vectorstores import Chroma
+from langchain_chroma import Chroma
 from langchain_core.language_models import BaseLanguageModel
 
 from behemot_framework.rag.document_loader import DocumentLoader

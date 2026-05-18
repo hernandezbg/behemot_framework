@@ -9,34 +9,35 @@ import tempfile
 from typing import List, Dict, Any, Union, Optional
 import logging
 
-# Importaciones básicas de LangChain
-from langchain_community.document_loaders import (
-    TextLoader,
-    PyPDFLoader,
-    CSVLoader,
-    WebBaseLoader,
-    DirectoryLoader,
-    S3FileLoader,
-    GoogleDriveLoader,
-)
 from langchain_core.documents import Document
-from langchain_community.document_loaders import UnstructuredMarkdownLoader
-# Para Google Drive
-import io
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseDownload
-from google.oauth2 import service_account
 
-# Para S3
-import boto3
-from botocore.exceptions import ClientError
+# Todos los loaders concretos (PDF, Markdown, CSV, Web, Directory, S3, Drive)
+# y los SDKs de cloud (boto3, google.cloud.storage, googleapiclient,
+# google.oauth2) se importan de forma perezosa dentro de cada método. Esto
+# permite que un proyecto que solo usa Markdown local con OpenAI no pague el
+# costo de tener `langchain-community`, `unstructured`, `boto3`, etc.
+# instalados.
 
-# Para GCP
-from google.cloud import storage
-
- 
 
 logger = logging.getLogger(__name__)
+
+
+def _require(import_func, extra_name: str, package_hint: str = ""):
+    """Ejecuta un import perezoso y traduce ImportError en un mensaje
+    accionable que sugiere el extra correcto a instalar.
+
+    `import_func` debe ser una función sin argumentos que ejecute el import
+    y devuelva el símbolo deseado. Se usa para mantener los imports cerca
+    del punto de uso sin perder claridad del mensaje de error.
+    """
+    try:
+        return import_func()
+    except ImportError as e:
+        hint = f" ({package_hint})" if package_hint else ""
+        raise ImportError(
+            f"Falta una dependencia opcional{hint}. "
+            f'Instala: pip install "behemot-framework[{extra_name}]"'
+        ) from e
 
 
 class DocumentLoader:
@@ -45,6 +46,11 @@ class DocumentLoader:
     @staticmethod
     def load_text(file_path: str) -> List[Document]:
         """Carga un archivo de texto"""
+        def _imp():
+            from langchain_community.document_loaders import TextLoader
+            return TextLoader
+        TextLoader = _require(_imp, "rag-loaders-web", "langchain-community")
+
         logger.info(f"Cargando texto desde {file_path}")
         loader = TextLoader(file_path)
         docs = loader.load()
@@ -61,6 +67,11 @@ class DocumentLoader:
     @staticmethod
     def load_pdf(file_path: str) -> List[Document]:
         """Carga un archivo PDF"""
+        def _imp():
+            from langchain_community.document_loaders import PyPDFLoader
+            return PyPDFLoader
+        PyPDFLoader = _require(_imp, "rag-loaders-pdf", "pypdf")
+
         logger.info(f"Cargando PDF desde {file_path}")
         loader = PyPDFLoader(file_path)
         docs = loader.load()
@@ -76,23 +87,45 @@ class DocumentLoader:
     
     @staticmethod
     def load_markdown(file_path: str) -> List[Document]:
-        """Carga un archivo Markdown"""
+        """Carga un archivo Markdown.
+
+        Prefiere `UnstructuredMarkdownLoader` si el extra
+        [rag-loaders-office] está instalado (mejor preservación de
+        estructura para .md complejos). Si no, usa un parser ligero con la
+        librería `markdown` que viene en [rag] — suficiente para el 95% de
+        casos de RAG sobre Markdown.
+        """
         logger.info(f"Cargando Markdown desde {file_path}")
-        loader = UnstructuredMarkdownLoader(file_path)
-        docs = loader.load()
-        
+
+        try:
+            from langchain_community.document_loaders import UnstructuredMarkdownLoader
+            loader = UnstructuredMarkdownLoader(file_path)
+            docs = loader.load()
+        except ImportError:
+            # Fallback: leer como texto plano. Para RAG es preferible al raw
+            # HTML porque el splitter trabaja sobre prosa, no markup.
+            logger.info("unstructured no instalado; usando parser markdown ligero")
+            with open(file_path, "r", encoding="utf-8") as fh:
+                content = fh.read()
+            docs = [Document(page_content=content, metadata={"source": file_path})]
+
         # Agregar metadata de filename
         filename = os.path.basename(file_path)
         for doc in docs:
             if not doc.metadata:
                 doc.metadata = {}
             doc.metadata['filename'] = filename
-            
+
         return docs
 
     @staticmethod
     def load_csv(file_path: str, csv_args: Optional[Dict[str, Any]] = None) -> List[Document]:
         """Carga un archivo CSV"""
+        def _imp():
+            from langchain_community.document_loaders import CSVLoader
+            return CSVLoader
+        CSVLoader = _require(_imp, "rag-loaders-web", "langchain-community")
+
         logger.info(f"Cargando CSV desde {file_path}")
         loader = CSVLoader(file_path, csv_args=csv_args or {})
         docs = loader.load()
@@ -132,6 +165,11 @@ class DocumentLoader:
             allow_private_networks=policy["allow_private_networks"],
         )
 
+        def _imp():
+            from langchain_community.document_loaders import WebBaseLoader
+            return WebBaseLoader
+        WebBaseLoader = _require(_imp, "rag-loaders-web", "langchain-community")
+
         logger.info(f"Cargando contenido desde URL: {url}")
         loader = WebBaseLoader(url)
         docs = loader.load()
@@ -154,6 +192,11 @@ class DocumentLoader:
     @staticmethod
     def load_directory(dir_path: str, glob_pattern: str = "**/*") -> List[Document]:
         """Carga todos los documentos en un directorio que coinciden con el patrón glob"""
+        def _imp():
+            from langchain_community.document_loaders import DirectoryLoader
+            return DirectoryLoader
+        DirectoryLoader = _require(_imp, "rag-loaders-web", "langchain-community")
+
         logger.info(f"Cargando documentos desde directorio: {dir_path}")
         loader = DirectoryLoader(dir_path, glob=glob_pattern)
         return loader.load()
@@ -171,18 +214,27 @@ class DocumentLoader:
             Lista de documentos cargados desde S3
         """
         logger.info(f"Cargando documento desde S3: {bucket_name}/{key}")
-        
+
+        def _imp_boto():
+            import boto3
+            from botocore.exceptions import ClientError
+            return boto3, ClientError
+        boto3, ClientError = _require(_imp_boto, "cloud", "boto3")
+
         # Método 1: Usando S3FileLoader de LangChain si está disponible para el tipo de archivo
         try:
+            from langchain_community.document_loaders import S3FileLoader
             loader = S3FileLoader(bucket_name, key)
             return loader.load()
+        except ImportError:
+            logger.info("S3FileLoader no disponible (langchain-community no instalado), usando boto3 directo")
         except Exception as e:
             logger.warning(f"Error al usar S3FileLoader: {e}, intentando método alternativo")
-        
+
         # Método 2: Descarga manual a archivo temporal
         with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(key)[1]) as temp_file:
             temp_path = temp_file.name
-        
+
         try:
             s3_client = boto3.client(
                 's3',
@@ -216,6 +268,11 @@ class DocumentLoader:
             Lista de documentos cargados.
         """
         logger.info(f"Cargando documento desde GCP: {bucket_name}/{blob_name}")
+
+        def _imp_gcs():
+            from google.cloud import storage
+            return storage
+        storage = _require(_imp_gcs, "cloud", "google-cloud-storage")
 
         try:
             # Crear un archivo temporal con la extensión correcta
@@ -301,30 +358,43 @@ class DocumentLoader:
             Lista de documentos cargados desde Google Drive
         """
         logger.info(f"Cargando documento desde Google Drive: {file_id}")
-        
+
+        def _imp_drive():
+            import io as _io
+            from googleapiclient.discovery import build
+            from googleapiclient.http import MediaIoBaseDownload
+            from google.oauth2 import service_account
+            return _io, build, MediaIoBaseDownload, service_account
+        io, build, MediaIoBaseDownload, service_account = _require(
+            _imp_drive, "cloud", "google-api-python-client / google-auth"
+        )
+
         # Método 1: Usando GoogleDriveLoader de LangChain
         credentials_path = credentials_path or os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
-        
+
         if not credentials_path and os.environ.get('GOOGLE_CREDENTIALS_JSON'):
             # Si las credenciales están en una variable de entorno como JSON
             import json
             import tempfile
-            
+
             creds_json = json.loads(os.environ.get('GOOGLE_CREDENTIALS_JSON'))
             with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json') as temp_file:
                 json.dump(creds_json, temp_file)
                 credentials_path = temp_file.name
-        
+
         try:
+            from langchain_community.document_loaders import GoogleDriveLoader
             loader = GoogleDriveLoader(
                 folder_id=None,  # No estamos cargando una carpeta
                 document_ids=[file_id],
                 credentials_path=credentials_path,
             )
             return loader.load()
+        except ImportError:
+            logger.info("GoogleDriveLoader no disponible, usando API de Google Drive directa")
         except Exception as e:
             logger.warning(f"Error al usar GoogleDriveLoader: {e}, intentando método alternativo")
-        
+
         # Método 2: Implementación manual con API de Google Drive
         try:
             # Autenticar con Google Drive API
