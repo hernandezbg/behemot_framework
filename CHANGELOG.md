@@ -2,6 +2,44 @@
 
 Todas las mejoras y cambios importantes de Behemot Framework se documentan en este archivo.
 
+## [0.5.2] - 2026-05-19
+
+### ⚠️ Breaking change: extra `[voice]` ahora vacío
+
+El extra `[voice]` declaraba 7 paquetes (`openai-whisper`, `faster-whisper`,
+`deepgram-sdk`, `SpeechRecognition`, `pydub`, `ffmpeg-python`,
+`soundfile`) que **nunca se importan en el código del framework**. El
+`TranscriptionService` solo usa `openai.audio.transcriptions`, ya
+cubierto por `openai` en `CORE_REQUIRES`. El extra arrastraba ~3 GB
+innecesarios (torch + CUDA + nvidia-* vía openai-whisper y
+faster-whisper), inflando imágenes Docker de 584 MB a 5.7 GB para
+deploys que solo necesitaban la API de Whisper de OpenAI.
+
+**Fix:** `[voice]` se redujo a `[]`. La funcionalidad de voz sigue
+funcionando exactamente igual porque depende solo del cliente `openai`
+que ya está en core.
+
+### Reservas para integraciones futuras
+
+Se agregaron dos extras stub para cuando se implementen backends
+locales/alternativos de transcripción:
+
+- `[voice-local-whisper]`: declara `openai-whisper` + `torch`. No tiene
+  dispatch implementado todavía — instalar este extra hoy no cambia el
+  comportamiento. Reservado para una futura entrada `VOICE_PROVIDER` en
+  la config.
+- `[voice-deepgram]`: declara `deepgram-sdk`. Mismo estado.
+
+### Migración
+
+| Tu caso | 0.5.1 | 0.5.2 |
+|---------|-------|-------|
+| Voz con API de OpenAI (90% de usuarios) | `[voice]` (5.7 GB) | `[voice]` (sin cambios, ~430 MB) |
+| Voz con Whisper local | `[voice]` (incluía whisper) | `[voice,voice-local-whisper]` (no implementado) |
+
+Si tu deploy bajó de 5.7 GB a ~500 MB sin que tu app de voz deje de
+funcionar, es esperado: nunca necesitaste esas dependencias.
+
 ## [0.5.1] - 2026-05-18
 
 ### 🐛 Fix crítico: Redis inalcanzable colgaba el arranque

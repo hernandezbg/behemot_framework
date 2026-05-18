@@ -78,13 +78,27 @@ EXTRAS = {
         "markdown",
         "sentence-transformers",
     ],
-    "voice": [
+    # Voz: el TranscriptionService usa openai.audio.transcriptions, que
+    # ya está cubierto por `openai` en CORE_REQUIRES. El extra existe
+    # como marcador semántico (deja explícito en el requirements que se
+    # quiere activar voice) sin instalar nada adicional.
+    #
+    # Breaking change vs 0.5.x: ya no instala openai-whisper,
+    # faster-whisper, deepgram-sdk, SpeechRecognition, pydub,
+    # ffmpeg-python, soundfile — ninguno se usa en el código actual y
+    # arrastraban ~3 GB de torch + CUDA.
+    #
+    # Para Whisper local (no implementado todavía en el framework),
+    # instalar [voice-local-whisper]. Para Deepgram, [voice-deepgram].
+    "voice": [],
+    "voice-local-whisper": [
+        # Reservado: integración pendiente. Quien instale esto debe
+        # implementar el dispatch en TranscriptionService.
         "openai-whisper",
-        "faster-whisper",
-        "pydub",
-        "ffmpeg-python",
-        "SpeechRecognition",
-        "soundfile",
+        "torch",
+    ],
+    "voice-deepgram": [
+        # Reservado: integración pendiente.
         "deepgram-sdk",
     ],
     "gemini": [
@@ -137,7 +151,7 @@ with open("README.md", encoding="utf-8") as f:
 
 setup(
     name="behemot_framework",
-    version="0.5.1",
+    version="0.5.2",
     packages=find_packages(),
     install_requires=CORE_REQUIRES,
     extras_require=EXTRAS,
