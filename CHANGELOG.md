@@ -2,6 +2,18 @@
 
 Todas las mejoras y cambios importantes de Behemot Framework se documentan en este archivo.
 
+## [0.5.4] - 2026-06-05
+
+### Bug fix crítico: TTS bloqueaba el event loop en modo adaptive/audio
+
+Las llamadas síncronas a la API de OpenAI TTS (`synthesize`) y a la API de
+WhatsApp/Telegram se ejecutaban directamente dentro de handlers `async` de
+FastAPI, congelando el event loop sin lanzar excepción. El agente recibía
+el mensaje, generaba la respuesta pero nunca la enviaba.
+
+Fix: `_enviar_respuesta_audio` en ambos conectores ahora ejecuta todas las
+llamadas bloqueantes con `asyncio.to_thread()`.
+
 ## [0.5.3] - 2026-06-05
 
 ### Nuevas funcionalidades

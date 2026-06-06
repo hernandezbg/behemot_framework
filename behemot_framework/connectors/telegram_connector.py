@@ -160,20 +160,23 @@ class TelegramConnector:
     async def _enviar_respuesta_audio(self, chat_id: int, texto: str) -> None:
         """
         Genera audio TTS y lo envía como nota de voz. Libera el temporal al terminar.
+        Las llamadas a OpenAI y a la API de Telegram son síncronas y se ejecutan en
+        un thread separado para no bloquear el event loop de FastAPI.
         """
+        import asyncio as _asyncio
         if self.tts_service is None:
             logger.warning("TTS no configurado; enviando texto como fallback.")
             self.enviar_mensaje(chat_id, texto)
             return
 
-        audio_path = self.tts_service.synthesize(texto)
+        audio_path = await _asyncio.to_thread(self.tts_service.synthesize, texto)
         if not audio_path:
             logger.warning("TTS falló; enviando texto como fallback.")
             self.enviar_mensaje(chat_id, texto)
             return
 
         try:
-            self.enviar_voz(chat_id, audio_path)
+            await _asyncio.to_thread(self.enviar_voz, chat_id, audio_path)
         finally:
             try:
                 os.remove(audio_path)

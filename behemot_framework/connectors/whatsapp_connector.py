@@ -276,22 +276,24 @@ class WhatsAppConnector:
     async def _enviar_respuesta_audio(self, to: str, texto: str) -> None:
         """
         Genera audio TTS, lo sube a WhatsApp y lo envía. Libera el temporal al terminar.
+        Las llamadas a OpenAI y a la API de Meta son síncronas y se ejecutan en un
+        thread separado para no bloquear el event loop de FastAPI.
         """
         if self.tts_service is None:
             logger.warning("TTS no configurado; enviando texto como fallback.")
             self.enviar_mensaje(to, texto)
             return
 
-        audio_path = self.tts_service.synthesize(texto)
+        audio_path = await asyncio.to_thread(self.tts_service.synthesize, texto)
         if not audio_path:
             logger.warning("TTS falló; enviando texto como fallback.")
             self.enviar_mensaje(to, texto)
             return
 
         try:
-            media_id = self._subir_media(audio_path)
+            media_id = await asyncio.to_thread(self._subir_media, audio_path)
             if media_id:
-                self._enviar_audio(to, media_id)
+                await asyncio.to_thread(self._enviar_audio, to, media_id)
             else:
                 logger.warning("No se obtuvo media_id; enviando texto como fallback.")
                 self.enviar_mensaje(to, texto)
