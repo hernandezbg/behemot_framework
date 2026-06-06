@@ -654,6 +654,13 @@ class BehemotFactory:
                     caption = mensaje.get("caption", "")
                     texto = caption if caption else "¿Qué puedes decirme sobre esta imagen?"
                     logger.info(f"Imagen recibida de {phone_number}: {imagen_path}, caption: '{caption}'")
+                elif mensaje["type"] == "location":
+                    lat = mensaje["latitude"]
+                    lon = mensaje["longitude"]
+                    name = mensaje.get("name", "")
+                    address = mensaje.get("address", "")
+                    texto = mensaje["content"]
+                    logger.info(f"Ubicación recibida de {phone_number}: lat={lat}, lon={lon}")
                 else:
                     logger.debug(f"Tipo de mensaje no soportado: {mensaje['type']}")
                     return {"status": "ok"}
@@ -1074,7 +1081,10 @@ def create_behemot_app(
         enable_google_chat: Activar conector de Google Chat
         enable_voice: Activar procesamiento de voz
         enable_test_local: Activar interfaz de prueba local con Gradio
-        use_tools: Lista de nombres de herramientas a cargar ("all" para todas)
+        use_tools: Lista de nombres de módulos de herramientas a cargar ("all" para todas).
+                   Cada nombre corresponde al archivo en el directorio tools/ sin extensión
+                   (ej: use_tools=["propiedades_cercanas"] carga tools/propiedades_cercanas.py),
+                   NO al nombre de la función decorada con @tool dentro del archivo.
         config_path: Ruta al archivo de configuración personalizado
         
     Returns:

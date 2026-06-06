@@ -2,6 +2,26 @@
 
 Todas las mejoras y cambios importantes de Behemot Framework se documentan en este archivo.
 
+## [0.5.7] - 2026-06-06
+
+### Bug fix
+
+**factory.py: mensajes de ubicación de WhatsApp no generaban respuesta**
+
+- El conector `whatsapp_connector.py` (v0.5.6) ya extraía correctamente `type=location`,
+  pero `factory.py` no tenía el caso `location` en su bloque de dispatch de tipos.
+  El mensaje caía en el `else` de la línea 657 y retornaba `{"status": "ok"}` sin
+  generar respuesta al usuario.
+- Fix: se agrega `elif mensaje["type"] == "location"` que usa `mensaje["content"]`
+  (ya construido por el conector) como texto para el asistente, manteniendo acceso
+  a `latitude`, `longitude`, `name` y `address` en el contexto del log.
+
+**Documentación: `use_tools` acepta nombres de módulos, no de funciones**
+
+- El parámetro `use_tools` de `create_behemot_app()` espera el nombre del archivo
+  `.py` dentro de `tools/` (ej: `"propiedades_cercanas"`), no el nombre de la
+  función decorada con `@tool`. Clarificado en el docstring.
+
 ## [0.5.6] - 2026-06-06
 
 ### Nuevas funcionalidades
