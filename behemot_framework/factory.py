@@ -59,9 +59,13 @@ class BehemotFactory:
                 language=config.get("TRANSCRIPTION_LANGUAGE")
             )
             self.tts_service = TTSService(
+                provider=config.get("TTS_PROVIDER", "openai"),
                 api_key=config.get("GPT_API_KEY"),
                 model=config.get("TTS_MODEL", "tts-1"),
                 voice=config.get("TTS_VOICE", "alloy"),
+                elevenlabs_api_key=config.get("ELEVENLABS_API_KEY"),
+                elevenlabs_voice_id=config.get("ELEVENLABS_VOICE_ID", "Rachel"),
+                elevenlabs_model=config.get("ELEVENLABS_MODEL", "eleven_multilingual_v2"),
             )
         else:
             self.transcriptor = None

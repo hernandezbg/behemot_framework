@@ -101,6 +101,9 @@ EXTRAS = {
         # Reservado: integración pendiente.
         "deepgram-sdk",
     ],
+    "voice-elevenlabs": [
+        "elevenlabs>=1.0.0",
+    ],
     "gemini": [
         "google-generativeai>=0.3.0",
         "langchain-google-genai>=1.0.0",
@@ -151,7 +154,7 @@ with open("README.md", encoding="utf-8") as f:
 
 setup(
     name="behemot_framework",
-    version="0.5.4",
+    version="0.5.5",
     packages=find_packages(),
     install_requires=CORE_REQUIRES,
     extras_require=EXTRAS,

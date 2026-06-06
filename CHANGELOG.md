@@ -2,6 +2,18 @@
 
 Todas las mejoras y cambios importantes de Behemot Framework se documentan en este archivo.
 
+## [0.5.5] - 2026-06-05
+
+### Nuevas funcionalidades
+
+**ElevenLabs como provider TTS alternativo**
+
+- `TTSService` ahora soporta `TTS_PROVIDER: "openai"` (default) o `"elevenlabs"`.
+- Nuevas variables de config: `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID` (default `Rachel`),
+  `ELEVENLABS_MODEL` (default `eleven_multilingual_v2`).
+- Nuevo extra de instalación: `pip install behemot-framework[voice-elevenlabs]`.
+- Si `elevenlabs` no está instalado y se configura ese provider, el error es claro en logs.
+
 ## [0.5.4] - 2026-06-05
 
 ### Bug fix crítico: TTS bloqueaba el event loop en modo adaptive/audio

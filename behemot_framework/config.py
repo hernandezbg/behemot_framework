@@ -188,11 +188,18 @@ class Config:
             "API_MAX_AUDIO_SIZE": int(os.getenv("API_MAX_AUDIO_SIZE", str(25 * 1024 * 1024))),
             
             # Configuración TTS (Text-to-Speech)
-            # Modo de respuesta para canales de voz: "text" | "audio" | "both"
+            # Modo de respuesta para canales de voz: "text" | "audio" | "both" | "adaptive"
             "WHATSAPP_RESPONSE_MODE": os.getenv("WHATSAPP_RESPONSE_MODE", "text"),
             "TELEGRAM_RESPONSE_MODE": os.getenv("TELEGRAM_RESPONSE_MODE", "text"),
+            # Provider TTS: "openai" | "elevenlabs"
+            "TTS_PROVIDER": os.getenv("TTS_PROVIDER", "openai"),
+            # OpenAI TTS
             "TTS_MODEL": os.getenv("TTS_MODEL", "tts-1"),
             "TTS_VOICE": os.getenv("TTS_VOICE", "alloy"),
+            # ElevenLabs TTS
+            "ELEVENLABS_API_KEY": os.getenv("ELEVENLABS_API_KEY", ""),
+            "ELEVENLABS_VOICE_ID": os.getenv("ELEVENLABS_VOICE_ID", "Rachel"),
+            "ELEVENLABS_MODEL": os.getenv("ELEVENLABS_MODEL", "eleven_multilingual_v2"),
 
             # Configuración de RAG (Retrieval Augmented Generation)
             "ENABLE_RAG": os.getenv("ENABLE_RAG", "false").lower() in ("true", "1", "yes"),
