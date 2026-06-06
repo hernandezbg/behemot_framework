@@ -3,12 +3,18 @@ import requests
 import os
 import tempfile
 import uuid
+import logging
+
+logger = logging.getLogger(__name__)
 
 class TelegramConnector:
     def __init__(self, token: str):
         self.token = token
         self.base_url = f"https://api.telegram.org/bot{token}"
         self.file_url = f"https://api.telegram.org/file/bot{token}"
+        # TTS: inyectados por factory tras la construcción
+        self.tts_service = None
+        self.response_mode = "text"  # "text" | "audio" | "both"
 
     def extraer_mensaje(self, update: dict) -> tuple:
         """
@@ -127,20 +133,77 @@ class TelegramConnector:
             print(f"Error al enviar acción: {e}")
 
     
-    #Método para manejar múltiples mensajes
+    def enviar_voz(self, chat_id: int, audio_path: str) -> bool:
+        """
+        Envía un archivo de audio como nota de voz en Telegram (sendVoice).
+        Telegram acepta OGG/OPUS y MP3 directamente sin upload previo.
+        """
+        if chat_id is None or not audio_path:
+            return False
+        endpoint = f"{self.base_url}/sendVoice"
+        try:
+            with open(audio_path, "rb") as f:
+                response = requests.post(
+                    endpoint,
+                    data={"chat_id": chat_id},
+                    files={"voice": (os.path.basename(audio_path), f, "audio/mpeg")},
+                )
+            if response.ok:
+                logger.info(f"Nota de voz enviada a chat_id {chat_id}")
+                return True
+            logger.error(f"Error enviando voz a {chat_id}: {response.text}")
+            return False
+        except Exception as e:
+            logger.error(f"Excepción al enviar voz a {chat_id}: {str(e)}")
+            return False
+
+    async def _enviar_respuesta_audio(self, chat_id: int, texto: str) -> None:
+        """
+        Genera audio TTS y lo envía como nota de voz. Libera el temporal al terminar.
+        """
+        if self.tts_service is None:
+            logger.warning("TTS no configurado; enviando texto como fallback.")
+            self.enviar_mensaje(chat_id, texto)
+            return
+
+        audio_path = self.tts_service.synthesize(texto)
+        if not audio_path:
+            logger.warning("TTS falló; enviando texto como fallback.")
+            self.enviar_mensaje(chat_id, texto)
+            return
+
+        try:
+            self.enviar_voz(chat_id, audio_path)
+        finally:
+            try:
+                os.remove(audio_path)
+            except OSError:
+                pass
+
     async def procesar_respuesta(self, chat_id: int, respuesta: str) -> None:
         """
-        Procesa la respuesta del asistente y maneja casos especiales.
+        Procesa la respuesta del asistente.
+
+        El comportamiento depende de self.response_mode:
+          - "text"  → solo mensaje de texto (comportamiento original)
+          - "audio" → solo nota de voz (TTS)
+          - "both"  → primero texto, luego nota de voz
         """
-        # Si la respuesta contiene un separador especial para múltiples mensajes
-        if "\n---SPLIT_MESSAGE---\n" in respuesta:
-            mensajes = respuesta.split("\n---SPLIT_MESSAGE---\n")
-            for mensaje in mensajes:
-                if mensaje.strip():
-                    self.enviar_mensaje(chat_id, mensaje.strip())
-                    # Pequeña pausa entre mensajes
-                    import asyncio
-                    await asyncio.sleep(0.5)
-        else:
-            # Respuesta normal
-            self.enviar_mensaje(chat_id, respuesta)
+        import asyncio
+
+        use_text  = self.response_mode in ("text", "both")
+        use_audio = self.response_mode in ("audio", "both")
+
+        partes = (
+            [m.strip() for m in respuesta.split("\n---SPLIT_MESSAGE---\n") if m.strip()]
+            if "\n---SPLIT_MESSAGE---\n" in respuesta
+            else [respuesta]
+        )
+
+        for i, parte in enumerate(partes):
+            if use_text:
+                self.enviar_mensaje(chat_id, parte)
+            if use_audio:
+                await self._enviar_respuesta_audio(chat_id, parte)
+            if len(partes) > 1:
+                await asyncio.sleep(0.5)

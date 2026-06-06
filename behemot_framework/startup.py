@@ -6,6 +6,7 @@ durante el arranque de la aplicación.
 """
 
 import logging
+import re
 import requests
 import asyncio
 import os
@@ -18,8 +19,34 @@ from fastapi import FastAPI
 # framework sin la extra `[cloud]` instalada.
 
 
-
 logger = logging.getLogger(__name__)
+
+
+def _sanitize_collection_name(folder: str) -> str:
+    """
+    Convierte un path de carpeta en un nombre de colección válido para ChromaDB.
+
+    ChromaDB requiere que los nombres:
+    - Empiecen con letra o dígito (no punto ni guión bajo)
+    - Contengan solo letras, dígitos, guiones, guiones bajos y puntos
+    - Tengan entre 3 y 63 caracteres
+
+    Ejemplos: "./docs" → "docs", "../data" → "data", "my/folder" → "my_folder"
+    """
+    # Normalizar separadores y quitar prefijos de ruta relativa ("./", "../")
+    name = folder.replace("\\", "/")
+    name = re.sub(r'^(\.\.?/)+', '', name)  # quita ./ y ../
+    name = name.replace("/", "_")
+    # Quitar caracteres inválidos al inicio (punto, guión bajo, guión)
+    name = re.sub(r'^[._\-]+', '', name)
+    # Reemplazar cualquier carácter que no sea alfanumérico, guión, guión bajo o punto
+    name = re.sub(r'[^a-zA-Z0-9._\-]', '_', name)
+    # Garantizar longitud mínima de 3
+    if len(name) < 3:
+        name = name + "_col"
+    # Truncar a 63 caracteres
+    name = name[:63]
+    return name or "default_collection"
 
 # ----- Funciones para Telegram -----
 
@@ -133,9 +160,9 @@ async def _ingest_from_local(folder: str, config: Dict[str, Any]) -> bool:
         from behemot_framework.rag.rag_manager import RAGManager
         
         # Usar RAGManager para obtener pipeline con configuración unificada
-        collection_name = folder.replace("/", "_").replace("\\", "_")
+        collection_name = _sanitize_collection_name(folder)
         rag_pipeline = RAGManager.get_pipeline(collection_name)
-        
+
         # Procesar todos los archivos de una vez usando el método aingest_documents
         try:
             logger.info(f"📄 Procesando {len(files)} archivos con pipeline RAG")
@@ -195,9 +222,9 @@ async def _ingest_from_gcp(folder: str, config: Dict[str, Any]) -> bool:
             return False
         
         # Usar RAGManager para obtener pipeline con configuración unificada
-        collection_name = folder.replace("/", "_").replace("\\", "_")
+        collection_name = _sanitize_collection_name(folder)
         rag_pipeline = RAGManager.get_pipeline(collection_name)
-        
+
         # Implementar lógica GCP completa
         from google.cloud import storage
         from google.oauth2 import service_account

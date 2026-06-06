@@ -17,6 +17,7 @@ from behemot_framework.assistants.assistant import Assistant
 from behemot_framework.connectors.telegram_connector import TelegramConnector
 from behemot_framework.connectors.api_connector import ApiConnector
 from behemot_framework.services.transcription_service import TranscriptionService
+from behemot_framework.services.tts_service import TTSService
 
 # Opcional para tipos futuros
 try:
@@ -57,8 +58,14 @@ class BehemotFactory:
                 api_key=config.get("GPT_API_KEY"),
                 language=config.get("TRANSCRIPTION_LANGUAGE")
             )
+            self.tts_service = TTSService(
+                api_key=config.get("GPT_API_KEY"),
+                model=config.get("TTS_MODEL", "tts-1"),
+                voice=config.get("TTS_VOICE", "alloy"),
+            )
         else:
             self.transcriptor = None
+            self.tts_service = None
             
         # Conectores (se inicializan bajo demanda)
         self.telegram_connector = None
@@ -120,6 +127,8 @@ class BehemotFactory:
             return
                 
         self.telegram_connector = TelegramConnector(token)
+        self.telegram_connector.tts_service = self.tts_service
+        self.telegram_connector.response_mode = self.config.get("TELEGRAM_RESPONSE_MODE", "text")
 
         # Priorizar la configuración específica de Telegram
         telegram_webhook_url = self.config.get("TELEGRAM_WEBHOOK_URL", "")
@@ -495,6 +504,8 @@ class BehemotFactory:
             
         # Inicializar el conector con el token de API y el phone ID
         self.whatsapp_connector = WhatsAppConnector(api_token, phone_number_id)
+        self.whatsapp_connector.tts_service = self.tts_service
+        self.whatsapp_connector.response_mode = self.config.get("WHATSAPP_RESPONSE_MODE", "text")
 
         # App Secret de Meta para validar la firma HMAC-SHA256 de cada POST.
         # Sin esto cualquiera con la URL del webhook puede inyectar mensajes
@@ -1010,7 +1021,9 @@ class BehemotFactory:
             
             # 7. Estado de voz
             if factory.transcriptor:
-                logger.info("🎤 Procesamiento de voz activado")
+                logger.info("🎤 Procesamiento de voz activado (STT: Whisper)")
+            if factory.tts_service:
+                logger.info("🔊 Síntesis de voz activada (TTS: OpenAI)")
             
             logger.info("=" * 60)
             logger.info("✅ Aplicación iniciada correctamente")

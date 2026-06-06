@@ -15,7 +15,7 @@ class WhatsAppConnector:
     def __init__(self, token: str, phone_number_id: str):
         """
         Inicializa el conector de WhatsApp Business API.
-        
+
         Args:
             token: Token de acceso de la API de WhatsApp
             phone_number_id: ID del número de teléfono en WhatsApp Business
@@ -27,6 +27,9 @@ class WhatsAppConnector:
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json"
         }
+        # TTS: inyectados por factory tras la construcción
+        self.tts_service = None
+        self.response_mode = "text"  # "text" | "audio" | "both"
         logger.info(f"Conector WhatsApp inicializado para phone_id: {phone_number_id}")
 
     def extraer_mensaje(self, update: dict) -> tuple:
@@ -226,35 +229,108 @@ class WhatsAppConnector:
         # Por ahora no implementamos nada, pero se mantiene por compatibilidad
         return True
         
+    def _subir_media(self, audio_path: str) -> Optional[str]:
+        """
+        Sube un archivo de audio a la API de WhatsApp y devuelve el media_id.
+        """
+        try:
+            url = f"https://graph.facebook.com/v17.0/{self.phone_number_id}/media"
+            headers = {"Authorization": f"Bearer {self.token}"}
+            with open(audio_path, "rb") as f:
+                files = {"file": (os.path.basename(audio_path), f, "audio/mpeg")}
+                data = {"messaging_product": "whatsapp", "type": "audio"}
+                response = requests.post(url, headers=headers, files=files, data=data)
+            if response.ok:
+                media_id = response.json().get("id")
+                logger.info(f"Audio subido a WhatsApp, media_id: {media_id}")
+                return media_id
+            logger.error(f"Error subiendo audio a WhatsApp: {response.text}")
+            return None
+        except Exception as e:
+            logger.error(f"Excepción al subir audio a WhatsApp: {str(e)}")
+            return None
+
+    def _enviar_audio(self, to: str, media_id: str) -> bool:
+        """
+        Envía un mensaje de audio usando un media_id previamente subido.
+        """
+        endpoint = f"{self.base_url}/messages"
+        payload = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": to,
+            "type": "audio",
+            "audio": {"id": media_id},
+        }
+        try:
+            response = requests.post(endpoint, headers=self.headers, json=payload)
+            if response.ok:
+                logger.info(f"Mensaje de audio enviado a {to}")
+                return True
+            logger.error(f"Error enviando audio a {to}: {response.text}")
+            return False
+        except Exception as e:
+            logger.error(f"Excepción al enviar audio a {to}: {str(e)}")
+            return False
+
+    async def _enviar_respuesta_audio(self, to: str, texto: str) -> None:
+        """
+        Genera audio TTS, lo sube a WhatsApp y lo envía. Libera el temporal al terminar.
+        """
+        if self.tts_service is None:
+            logger.warning("TTS no configurado; enviando texto como fallback.")
+            self.enviar_mensaje(to, texto)
+            return
+
+        audio_path = self.tts_service.synthesize(texto)
+        if not audio_path:
+            logger.warning("TTS falló; enviando texto como fallback.")
+            self.enviar_mensaje(to, texto)
+            return
+
+        try:
+            media_id = self._subir_media(audio_path)
+            if media_id:
+                self._enviar_audio(to, media_id)
+            else:
+                logger.warning("No se obtuvo media_id; enviando texto como fallback.")
+                self.enviar_mensaje(to, texto)
+        finally:
+            try:
+                os.remove(audio_path)
+            except OSError:
+                pass
+
     async def procesar_respuesta(self, to: str, respuesta: str) -> None:
         """
-        Procesa la respuesta del asistente y maneja casos especiales.
-        
-        Args:
-            to: Número de teléfono del destinatario
-            respuesta: Texto de respuesta
+        Procesa la respuesta del asistente.
+
+        El comportamiento depende de self.response_mode:
+          - "text"  → solo mensaje de texto (comportamiento original)
+          - "audio" → solo mensaje de audio (TTS)
+          - "both"  → primero texto, luego audio
         """
         logger.info(f"Procesando respuesta para {to}: {respuesta[:50]}...")
-        
-        # Si la respuesta contiene un separador especial para múltiples mensajes
-        if "\n---SPLIT_MESSAGE---\n" in respuesta:
-            mensajes = respuesta.split("\n---SPLIT_MESSAGE---\n")
-            logger.info(f"Enviando respuesta dividida en {len(mensajes)} mensajes")
-            
-            for i, mensaje in enumerate(mensajes):
-                if mensaje.strip():
-                    logger.info(f"Enviando parte {i+1}/{len(mensajes)}")
-                    result = self.enviar_mensaje(to, mensaje.strip())
-                    if not result:
-                        logger.error(f"Fallo al enviar parte {i+1}/{len(mensajes)}")
-                    # Pequeña pausa entre mensajes
-                    await asyncio.sleep(1.0)  # Aumentado a 1 segundo para evitar límites de tasa
-        else:
-            # Respuesta normal
-            logger.info("Enviando respuesta única")
-            result = self.enviar_mensaje(to, respuesta)
-            if not result:
-                logger.error("Fallo al enviar respuesta única")
+
+        use_text  = self.response_mode in ("text", "both")
+        use_audio = self.response_mode in ("audio", "both")
+
+        # Soporte para respuestas multi-parte
+        partes = (
+            [m.strip() for m in respuesta.split("\n---SPLIT_MESSAGE---\n") if m.strip()]
+            if "\n---SPLIT_MESSAGE---\n" in respuesta
+            else [respuesta]
+        )
+
+        for i, parte in enumerate(partes):
+            if use_text:
+                result = self.enviar_mensaje(to, parte)
+                if not result:
+                    logger.error(f"Fallo al enviar texto parte {i+1}/{len(partes)}")
+            if use_audio:
+                await self._enviar_respuesta_audio(to, parte)
+            if len(partes) > 1:
+                await asyncio.sleep(1.0)
     
     def verificar_token(self, hub_mode: str, hub_verify_token: str, hub_challenge: str, verify_token: str) -> Optional[str]:
         """

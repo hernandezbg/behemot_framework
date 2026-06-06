@@ -187,6 +187,13 @@ class Config:
             "API_MAX_REQUEST_SIZE": int(os.getenv("API_MAX_REQUEST_SIZE", str(10 * 1024 * 1024))),
             "API_MAX_AUDIO_SIZE": int(os.getenv("API_MAX_AUDIO_SIZE", str(25 * 1024 * 1024))),
             
+            # Configuración TTS (Text-to-Speech)
+            # Modo de respuesta para canales de voz: "text" | "audio" | "both"
+            "WHATSAPP_RESPONSE_MODE": os.getenv("WHATSAPP_RESPONSE_MODE", "text"),
+            "TELEGRAM_RESPONSE_MODE": os.getenv("TELEGRAM_RESPONSE_MODE", "text"),
+            "TTS_MODEL": os.getenv("TTS_MODEL", "tts-1"),
+            "TTS_VOICE": os.getenv("TTS_VOICE", "alloy"),
+
             # Configuración de RAG (Retrieval Augmented Generation)
             "ENABLE_RAG": os.getenv("ENABLE_RAG", "false").lower() in ("true", "1", "yes"),
             "AUTO_RAG": os.getenv("AUTO_RAG", "false").lower() in ("true", "1", "yes"),  # Nuevo: RAG automático
