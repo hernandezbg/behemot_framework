@@ -180,19 +180,24 @@ class TelegramConnector:
             except OSError:
                 pass
 
-    async def procesar_respuesta(self, chat_id: int, respuesta: str) -> None:
+    async def procesar_respuesta(self, chat_id: int, respuesta: str, input_type: str = "text") -> None:
         """
         Procesa la respuesta del asistente.
 
         El comportamiento depende de self.response_mode:
-          - "text"  → solo mensaje de texto (comportamiento original)
-          - "audio" → solo nota de voz (TTS)
-          - "both"  → primero texto, luego nota de voz
+          - "text"     → solo mensaje de texto (comportamiento original)
+          - "audio"    → solo nota de voz (TTS)
+          - "both"     → primero texto, luego nota de voz
+          - "adaptive" → audio si el usuario envió audio, texto en cualquier otro caso
         """
         import asyncio
 
-        use_text  = self.response_mode in ("text", "both")
-        use_audio = self.response_mode in ("audio", "both")
+        if self.response_mode == "adaptive":
+            use_text  = input_type != "voice"
+            use_audio = input_type == "voice"
+        else:
+            use_text  = self.response_mode in ("text", "both")
+            use_audio = self.response_mode in ("audio", "both")
 
         partes = (
             [m.strip() for m in respuesta.split("\n---SPLIT_MESSAGE---\n") if m.strip()]

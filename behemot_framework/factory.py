@@ -243,7 +243,7 @@ class BehemotFactory:
                 respuesta = await self.asistente.generar_respuesta(str(chat_id), texto, imagen_path)
                 # Verificar si el conector tiene método procesar_respuesta
                 if hasattr(self.telegram_connector, 'procesar_respuesta'):
-                    await self.telegram_connector.procesar_respuesta(chat_id, respuesta)
+                    await self.telegram_connector.procesar_respuesta(chat_id, respuesta, mensaje["type"])
                 else:
                     # Fallback al método enviar_mensaje
                     self.telegram_connector.enviar_mensaje(chat_id, respuesta)
@@ -661,7 +661,7 @@ class BehemotFactory:
                     
                     # Enviar respuesta
                     logger.info(f"Enviando respuesta a {phone_number}")
-                    await self.whatsapp_connector.procesar_respuesta(phone_number, respuesta)
+                    await self.whatsapp_connector.procesar_respuesta(phone_number, respuesta, mensaje["type"])
                     logger.info("Respuesta enviada correctamente")
                 else:
                     logger.warning(f"No se pudo extraer texto del mensaje")

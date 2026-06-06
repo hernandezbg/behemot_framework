@@ -301,19 +301,24 @@ class WhatsAppConnector:
             except OSError:
                 pass
 
-    async def procesar_respuesta(self, to: str, respuesta: str) -> None:
+    async def procesar_respuesta(self, to: str, respuesta: str, input_type: str = "text") -> None:
         """
         Procesa la respuesta del asistente.
 
         El comportamiento depende de self.response_mode:
-          - "text"  → solo mensaje de texto (comportamiento original)
-          - "audio" → solo mensaje de audio (TTS)
-          - "both"  → primero texto, luego audio
+          - "text"     → solo mensaje de texto (comportamiento original)
+          - "audio"    → solo mensaje de audio (TTS)
+          - "both"     → primero texto, luego audio
+          - "adaptive" → audio si el usuario envió audio, texto en cualquier otro caso
         """
         logger.info(f"Procesando respuesta para {to}: {respuesta[:50]}...")
 
-        use_text  = self.response_mode in ("text", "both")
-        use_audio = self.response_mode in ("audio", "both")
+        if self.response_mode == "adaptive":
+            use_text  = input_type != "voice"
+            use_audio = input_type == "voice"
+        else:
+            use_text  = self.response_mode in ("text", "both")
+            use_audio = self.response_mode in ("audio", "both")
 
         # Soporte para respuestas multi-parte
         partes = (
