@@ -2,6 +2,18 @@
 
 Todas las mejoras y cambios importantes de Behemot Framework se documentan en este archivo.
 
+## [0.5.6] - 2026-06-06
+
+### Nuevas funcionalidades
+
+**Soporte de mensajes de ubicación en WhatsApp**
+
+- `extraer_mensaje()` ahora maneja `"type": "location"`.
+- El agente recibe las coordenadas en `content` como texto natural
+  ("El usuario compartió su ubicación: latitud X, longitud Y") compatible
+  con el flujo existente, más los campos estructurados `latitude`, `longitude`,
+  `name` y `address` para tools que los necesiten directamente.
+
 ## [0.5.5] - 2026-06-05
 
 ### Nuevas funcionalidades

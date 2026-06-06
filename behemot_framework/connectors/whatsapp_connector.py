@@ -81,11 +81,30 @@ class WhatsAppConnector:
                     image_path = self.descargar_archivo_media(image_id, "image")
                     if image_path:
                         return sender, {
-                            "type": "image", 
+                            "type": "image",
                             "content": image_path,
                             "caption": caption
                         }
-                    
+
+            elif message_type == "location":
+                location = message.get("location", {})
+                lat = location.get("latitude")
+                lon = location.get("longitude")
+                if lat is not None and lon is not None:
+                    parts = [f"El usuario compartió su ubicación: latitud {lat}, longitud {lon}"]
+                    if location.get("name"):
+                        parts.append(f"Nombre: {location['name']}")
+                    if location.get("address"):
+                        parts.append(f"Dirección: {location['address']}")
+                    return sender, {
+                        "type": "location",
+                        "content": ". ".join(parts),
+                        "latitude": lat,
+                        "longitude": lon,
+                        "name": location.get("name", ""),
+                        "address": location.get("address", ""),
+                    }
+
             # No procesamos otros tipos por ahora
             return sender, None
             
