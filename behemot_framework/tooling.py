@@ -46,6 +46,17 @@ class Param:
 def tool(name: str, description: str, params: List[Param] = []):
     """
     Decorador para registrar una herramienta.
+
+    La función decorada debe aceptar un único argumento posicional `args: dict`
+    que contendrá todos los parámetros que el LLM pasó a la tool. No usar
+    parámetros individuales — call_tool siempre llama handler(args_dict).
+
+    Ejemplo::
+
+        @tool("buscar", "Busca algo", [Param("query", "string", "Texto", required=True)])
+        async def buscar(args: dict):
+            query = args["query"]
+            return f"Resultado para: {query}"
     """
     def decorator(func: Callable):
         # Construir el esquema de parámetros en formato JSON Schema

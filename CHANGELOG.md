@@ -2,6 +2,21 @@
 
 Todas las mejoras y cambios importantes de Behemot Framework se documentan en este archivo.
 
+## [0.5.8] - 2026-06-06
+
+### Documentación
+
+**Corrección: firma correcta del handler en el decorador `@tool`**
+
+- El README mostraba `async def mi_herramienta(parametro: str)` con parámetros
+  individuales, pero `call_tool` siempre llama `handler(args)` pasando el dict
+  completo como único argumento posicional.
+- El ejemplo en README.md ahora usa `async def mi_herramienta(args: dict)` con
+  acceso explícito `args["parametro"]`, consistente con cómo lo implementan las
+  tools internas del framework (ej: `date_tools.py`).
+- El docstring del decorador `@tool` en `tooling.py` documenta explícitamente
+  la convención y muestra un ejemplo correcto.
+
 ## [0.5.7] - 2026-06-06
 
 ### Bug fix

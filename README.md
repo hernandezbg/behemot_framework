@@ -111,8 +111,9 @@ from behemot_framework.tooling import tool, Param
         Param("parametro", "string", "Descripción del parámetro", required=True)
     ]
 )
-async def mi_herramienta(parametro: str):
-    # Tu lógica aquí
+async def mi_herramienta(args: dict):
+    # El framework siempre llama al handler con el dict completo de argumentos
+    parametro = args["parametro"]
     return f"Resultado procesando: {parametro}"
 ```
 
