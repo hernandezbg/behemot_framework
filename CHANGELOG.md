@@ -2,6 +2,31 @@
 
 Todas las mejoras y cambios importantes de Behemot Framework se documentan en este archivo.
 
+## [0.5.3] - 2026-06-05
+
+### Nuevas funcionalidades
+
+**TTS (Text-to-Speech) en WhatsApp y Telegram**
+
+- Nuevo `TTSService` (`services/tts_service.py`) usando `openai.audio.speech.create`.
+  Se instancia automáticamente junto con el `TranscriptionService` cuando `ENABLE_VOICE=True`.
+- `procesar_respuesta()` en ambos conectores acepta cuatro modos de respuesta
+  configurables vía YAML:
+  - `text` — solo texto (comportamiento anterior, default)
+  - `audio` — solo audio TTS
+  - `both` — texto + audio en el mismo turno
+  - `adaptive` — audio si el usuario envió audio, texto si escribió
+- WhatsApp: sube el MP3 generado a la Media API de Meta y lo envía como `audio`.
+- Telegram: usa `sendVoice` directamente (sin upload previo).
+- Variables de config nuevas: `WHATSAPP_RESPONSE_MODE`, `TELEGRAM_RESPONSE_MODE`,
+  `TTS_MODEL` (default `tts-1`), `TTS_VOICE` (default `alloy`).
+
+**Bug fix: nombres de colección ChromaDB con paths relativos**
+
+- `./docs` en `RAG_FOLDERS` generaba `._docs`, rechazado por ChromaDB.
+- Nueva función `_sanitize_collection_name()` en `startup.py` que normaliza
+  cualquier path (`./`, `../`, separadores, caracteres inválidos, longitud mínima).
+
 ## [0.5.2] - 2026-05-19
 
 ### ⚠️ Breaking change: extra `[voice]` ahora vacío
