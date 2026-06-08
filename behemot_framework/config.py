@@ -187,6 +187,13 @@ class Config:
             "API_MAX_REQUEST_SIZE": int(os.getenv("API_MAX_REQUEST_SIZE", str(10 * 1024 * 1024))),
             "API_MAX_AUDIO_SIZE": int(os.getenv("API_MAX_AUDIO_SIZE", str(25 * 1024 * 1024))),
             
+            # Observabilidad con Langfuse (opcional).
+            # Si LANGFUSE_SECRET_KEY y LANGFUSE_PUBLIC_KEY están configuradas,
+            # cada turno del agente genera un trace en Langfuse.
+            "LANGFUSE_SECRET_KEY": os.getenv("LANGFUSE_SECRET_KEY", ""),
+            "LANGFUSE_PUBLIC_KEY": os.getenv("LANGFUSE_PUBLIC_KEY", ""),
+            "LANGFUSE_HOST": os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com"),
+
             # Prefijo para mensajes de broadcast (&sendmsg). Vacío = sin prefijo.
             # Ejemplo YAML: SENDMSG_PREFIX: "📢 Mensaje de Ricci Propiedades:"
             "SENDMSG_PREFIX": os.getenv("SENDMSG_PREFIX", ""),

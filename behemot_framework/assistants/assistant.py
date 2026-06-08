@@ -64,6 +64,24 @@ class Assistant:
             logger.info("🚫 MORPHING deshabilitado")
 
     async def generar_respuesta(self, chat_id: str, mensaje_usuario: str, imagen_path: str = None) -> str:
+        """Punto de entrada público. Envuelve _run_turn con tracing de Langfuse."""
+        from behemot_framework.services.observability import start_trace, end_trace
+        trace = start_trace(
+            name="chat-turn",
+            user_id=chat_id,
+            input_data={"message": mensaje_usuario},
+            metadata={"model": Config.get("MODEL_NAME", "unknown")},
+        )
+        result = None
+        try:
+            result = await self._run_turn(chat_id, mensaje_usuario, imagen_path)
+            return result
+        except Exception:
+            raise
+        finally:
+            end_trace(trace, result)
+
+    async def _run_turn(self, chat_id: str, mensaje_usuario: str, imagen_path: str = None) -> str:
 
         # Verificar si es un comando especial
         if mensaje_usuario.strip().startswith("&"):
@@ -333,6 +351,30 @@ class Assistant:
                 response = self.modelo.generar_respuesta_con_functions(conversation, functions)
             except Exception as e:
                 return f"Error al generar respuesta: {str(e)}"
+
+            # Observability: registrar la llamada LLM con tokens si están disponibles
+            from behemot_framework.services.observability import get_current_trace, record_generation
+            _obs_trace = get_current_trace()
+            if _obs_trace:
+                _first_content = ""
+                try:
+                    _first_content = response.choices[0].message.content or ""
+                except Exception:
+                    pass
+                _usage = None
+                if hasattr(response, "usage") and response.usage:
+                    _usage = {
+                        "input": response.usage.prompt_tokens,
+                        "output": response.usage.completion_tokens,
+                    }
+                record_generation(
+                    _obs_trace,
+                    name="llm-call",
+                    model=getattr(self.modelo, "model_name", "unknown"),
+                    input_messages=conversation,
+                    output=_first_content,
+                    usage=_usage,
+                )
 
         choice = response.choices[0]
         

@@ -135,6 +135,10 @@ async def call_tool(name: str, arguments: str, auto_response: bool = True) -> st
     if asyncio.iscoroutine(result):
         result = await result
 
+    # Observability: registrar la tool call en el trace activo (no-op si no hay trace)
+    from behemot_framework.services.observability import record_tool_span
+    record_tool_span(name, args, result)
+
     # Si hay un callback registrado para esta herramienta, ejecútalo
     if auto_response and name in TOOL_CALLBACKS:
         callback = TOOL_CALLBACKS[name]

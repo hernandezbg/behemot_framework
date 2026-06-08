@@ -135,6 +135,12 @@ EXTRAS = {
         "gradio>=4.0.0",
         "Pillow>=10.0.0",
     ],
+    "observability": [
+        # Tracing con Langfuse: cada turno del agente genera un trace con
+        # input del usuario, output del asistente, tool calls y (para OpenAI)
+        # conteo de tokens. Requiere LANGFUSE_SECRET_KEY y LANGFUSE_PUBLIC_KEY.
+        "langfuse>=2.0.0",
+    ],
     "dev": [
         "pytest",
         "pytest-asyncio",
@@ -154,7 +160,7 @@ with open("README.md", encoding="utf-8") as f:
 
 setup(
     name="behemot_framework",
-    version="0.5.9",
+    version="0.6.0",
     packages=find_packages(),
     install_requires=CORE_REQUIRES,
     extras_require=EXTRAS,

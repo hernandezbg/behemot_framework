@@ -1102,6 +1102,17 @@ def create_behemot_app(
     # que la flag de Python sea ignorada por un default heredado.
     config["ENABLE_VOICE"] = bool(enable_voice)
 
+    # Observabilidad: inicializar Langfuse si las claves están configuradas
+    _lf_secret = config.get("LANGFUSE_SECRET_KEY", "")
+    _lf_public = config.get("LANGFUSE_PUBLIC_KEY", "")
+    if _lf_secret and _lf_public:
+        from behemot_framework.services.observability import init_observability
+        init_observability(
+            secret_key=_lf_secret,
+            public_key=_lf_public,
+            host=config.get("LANGFUSE_HOST", "https://cloud.langfuse.com"),
+        )
+
     # Crear la app base
     app = FastAPI(title="Behemot Framework", description="Framework modular para asistentes IA")
 

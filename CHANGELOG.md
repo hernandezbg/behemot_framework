@@ -2,6 +2,43 @@
 
 Todas las mejoras y cambios importantes de Behemot Framework se documentan en este archivo.
 
+## [0.6.0] - 2026-06-08
+
+### Nuevas funcionalidades
+
+**Observabilidad con Langfuse (opcional)**
+
+Cada turno del agente ahora puede generar un trace en Langfuse con:
+- Input del usuario y output final del asistente
+- Span por cada tool call (nombre, argumentos, resultado)
+- Generation LLM con conteo de tokens de prompt y completion (providers OpenAI)
+- Latencia total y por paso
+
+**Activación:**
+
+```yaml
+# config.yaml
+LANGFUSE_SECRET_KEY: "sk-lf-..."
+LANGFUSE_PUBLIC_KEY:  "pk-lf-..."
+LANGFUSE_HOST: "https://cloud.langfuse.com"   # opcional, es el default
+```
+
+```bash
+pip install behemot-framework[observability]
+```
+
+Si las claves no están configuradas, el framework funciona exactamente igual que antes — toda la lógica de observabilidad es un no-op.
+
+**Archivos nuevos/modificados:**
+- `services/observability.py` — singleton Langfuse con API `start_trace`, `end_trace`,
+  `record_generation`, `record_tool_span`. Usa `contextvars` para propagar el trace
+  activo entre `generar_respuesta` → `call_tool` de forma async-safe.
+- `assistants/assistant.py` — `generar_respuesta` ahora es un thin wrapper que
+  inicia/cierra el trace; la lógica existente se movió a `_run_turn`.
+- `tooling.py` — `call_tool` llama `record_tool_span` tras ejecutar el handler.
+- `factory.py` — llama `init_observability` al arrancar si las claves están presentes.
+- `config.py` — nuevas claves `LANGFUSE_SECRET_KEY`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_HOST`.
+
 ## [0.5.9] - 2026-06-07
 
 ### Bug fixes
