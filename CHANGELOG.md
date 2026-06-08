@@ -2,6 +2,26 @@
 
 Todas las mejoras y cambios importantes de Behemot Framework se documentan en este archivo.
 
+## [0.5.9] - 2026-06-07
+
+### Bug fixes
+
+**&sendmsg: await sobre función síncrona en WhatsApp**
+
+- `_send_to_platform` en `admin_commands.py` hacía `await enviar_mensaje(...)` pero
+  `WhatsAppConnector.enviar_mensaje` es síncrona y devuelve `bool`. El await lanzaba
+  `object bool can't be used in 'await' expression`, haciendo que todos los envíos se
+  contaran como fallidos aunque WhatsApp devolviera HTTP 200.
+- Fix: se elimina el `await` y se retorna directamente el `bool` del conector.
+
+**&sendmsg: prefijo hardcodeado ahora es configurable**
+
+- El texto `"📢 **Mensaje del administrador:**"` estaba hardcodeado en `execute_sendmsg`.
+- Nuevo parámetro `prefix: str = ""` en `execute_sendmsg`. Si está vacío el mensaje
+  se envía sin prefijo; si tiene valor se antepone con dos saltos de línea.
+- Nueva clave de configuración `SENDMSG_PREFIX` (env var o YAML). Default: vacío.
+  Ejemplo: `SENDMSG_PREFIX: "📢 Aviso de Ricci Propiedades:"`.
+
 ## [0.5.8] - 2026-06-06
 
 ### Documentación

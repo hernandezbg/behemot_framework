@@ -605,11 +605,15 @@ async def sendmsg_command(chat_id: str, message: str = None, platform: str = Non
         
         # Ejecutar el comando de envío masivo
         logger.info(f"Ejecutando sendmsg desde {chat_id}, mensaje: {message[:50]}..., plataforma: {platform}")
-        
+
+        from behemot_framework.config import Config
+        sendmsg_prefix = Config.get("SENDMSG_PREFIX", "")
+
         result = await admin_commands.execute_sendmsg(
             admin_user_id=chat_id,
             broadcast_message=message,
-            target_platform=platform
+            target_platform=platform,
+            prefix=sendmsg_prefix,
         )
         
         return result["message"]

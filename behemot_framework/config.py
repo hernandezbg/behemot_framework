@@ -187,6 +187,10 @@ class Config:
             "API_MAX_REQUEST_SIZE": int(os.getenv("API_MAX_REQUEST_SIZE", str(10 * 1024 * 1024))),
             "API_MAX_AUDIO_SIZE": int(os.getenv("API_MAX_AUDIO_SIZE", str(25 * 1024 * 1024))),
             
+            # Prefijo para mensajes de broadcast (&sendmsg). Vacío = sin prefijo.
+            # Ejemplo YAML: SENDMSG_PREFIX: "📢 Mensaje de Ricci Propiedades:"
+            "SENDMSG_PREFIX": os.getenv("SENDMSG_PREFIX", ""),
+
             # Configuración TTS (Text-to-Speech)
             # Modo de respuesta para canales de voz: "text" | "audio" | "both" | "adaptive"
             "WHATSAPP_RESPONSE_MODE": os.getenv("WHATSAPP_RESPONSE_MODE", "text"),

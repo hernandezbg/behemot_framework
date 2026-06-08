@@ -62,7 +62,7 @@ class AdminCommands:
                 
         return None
     
-    async def execute_sendmsg(self, admin_user_id: str, broadcast_message: str, target_platform: Optional[str] = None) -> Dict:
+    async def execute_sendmsg(self, admin_user_id: str, broadcast_message: str, target_platform: Optional[str] = None, prefix: str = "") -> Dict:
         """
         Ejecuta el comando de envío masivo.
         
@@ -98,7 +98,7 @@ class AdminCommands:
                 }
             
             # Preparar mensaje de broadcast
-            broadcast_text = f"📢 **Mensaje del administrador:**\n\n{broadcast_message}"
+            broadcast_text = f"{prefix}\n\n{broadcast_message}" if prefix else broadcast_message
             
             sent_count = 0
             failed_count = 0
@@ -192,9 +192,8 @@ class AdminCommands:
                 return True
                 
             elif platform == "whatsapp" and hasattr(self.factory, 'whatsapp_connector') and self.factory.whatsapp_connector:
-                # Enviar vía WhatsApp
-                await self.factory.whatsapp_connector.enviar_mensaje(user_id, message)
-                return True
+                # Enviar vía WhatsApp (enviar_mensaje es síncrono, devuelve bool)
+                return self.factory.whatsapp_connector.enviar_mensaje(user_id, message)
                 
             elif platform == "google_chat" and hasattr(self.factory, 'google_chat_connector') and self.factory.google_chat_connector:
                 # Google Chat requiere un space específico, más complejo
