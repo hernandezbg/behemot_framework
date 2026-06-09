@@ -2,6 +2,16 @@
 
 Todas las mejoras y cambios importantes de Behemot Framework se documentan en este archivo.
 
+## [0.6.2] - 2026-06-09
+
+### Bug fix
+
+**NameError: asyncio no importado en factory.py (handoff WhatsApp)**
+
+- El bloque de handoff en el handler de WhatsApp usaba `asyncio.to_thread()`
+  pero `asyncio` no estaba en los imports del módulo `factory.py`.
+- Fix: `import asyncio` agregado al inicio de `factory.py`.
+
 ## [0.6.1] - 2026-06-09
 
 ### Nuevas funcionalidades
