@@ -2,6 +2,18 @@
 
 Todas las mejoras y cambios importantes de Behemot Framework se documentan en este archivo.
 
+## [0.6.3] - 2026-06-09
+
+### Bug fix
+
+**Handoff: 405 Method Not Allowed al llamar a behemot.net**
+
+- Django tiene `APPEND_SLASH = True` por defecto: redirige `/start` → `/start/`
+  con un 301. `requests` sigue el redirect convirtiendo el POST en GET, lo que
+  resulta en `405 Método GET no permitido`.
+- Fix: trailing slash agregado a los tres endpoints del cliente:
+  `start/`, `{id}/message/`, `{id}/end/`.
+
 ## [0.6.2] - 2026-06-09
 
 ### Bug fix

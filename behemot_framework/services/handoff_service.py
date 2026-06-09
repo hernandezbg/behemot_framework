@@ -135,7 +135,7 @@ def start_handoff(
             "history": history,
         }
         resp = requests.post(
-            f"{_webhook_url}start",
+            f"{_webhook_url}start/",
             json=payload,
             headers=_headers(),
             timeout=10,
@@ -162,7 +162,7 @@ def forward_message(user_id: str, content: str) -> bool:
     session_id = data["session_id"]
     try:
         resp = requests.post(
-            f"{_webhook_url}{session_id}/message",
+            f"{_webhook_url}{session_id}/message/",
             json={"content": content},
             headers=_headers(),
             timeout=10,
@@ -189,7 +189,7 @@ def end_handoff_local(user_id: str, reason: str = "bot_retake") -> bool:
     session_id = data["session_id"]
     try:
         requests.post(
-            f"{_webhook_url}{session_id}/end",
+            f"{_webhook_url}{session_id}/end/",
             json={"reason": reason},
             headers=_headers(),
             timeout=10,
