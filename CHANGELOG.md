@@ -2,6 +2,22 @@
 
 Todas las mejoras y cambios importantes de Behemot Framework se documentan en este archivo.
 
+## [0.6.5] - 2026-06-09
+
+### Debug / diagnóstico
+
+**Handoff webhook: log del body entrante para diagnóstico**
+
+Agrega `logger.info` antes de `json.loads` en `/handoff/webhook` que registra
+`len`, `Content-Type` y los primeros 300 bytes del body. Si el Celery worker de
+behemot.net envía el payload con `data=dict` (form-encoded) en lugar de
+`json=dict`, el log lo evidencia y el `logger.error` en el except muestra el
+error exacto de parseo.
+
+El bug esperado: behemot.net usa `requests.post(url, data=payload)` → body
+llega como `event=agent.message&session_id=...` (form-encoded, no JSON) → 400.
+Fix en behemot.net: cambiar `data=` por `json=`.
+
 ## [0.6.4] - 2026-06-09
 
 ### Bug fixes

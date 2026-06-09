@@ -931,6 +931,12 @@ class BehemotFactory:
         @fastapi_app.post("/handoff/webhook")
         async def handoff_webhook(request: Request):
             body = await request.body()
+            logger.info(
+                "handoff webhook recv: len=%d content-type=%s body=%r",
+                len(body),
+                request.headers.get("Content-Type", ""),
+                body[:300],
+            )
             sig  = request.headers.get("X-Behemot-Signature", "")
             secret = self.config.get("HANDOFF_WEBHOOK_SECRET", "")
 
@@ -939,7 +945,8 @@ class BehemotFactory:
 
             try:
                 event = json.loads(body)
-            except Exception:
+            except Exception as exc:
+                logger.error("handoff webhook json parse error: %s — body=%r", exc, body[:300])
                 raise HTTPException(status_code=400, detail="Body no es JSON válido")
 
             event_type = event.get("event")
