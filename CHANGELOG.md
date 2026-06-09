@@ -2,6 +2,17 @@
 
 Todas las mejoras y cambios importantes de Behemot Framework se documentan en este archivo.
 
+## [0.6.7] - 2026-06-09
+
+### Bug fix
+
+**Handoff webhook: NameError `json` no definido**
+
+`factory.py` no tenía `import json` a nivel de módulo. El handler
+`setup_handoff_webhook` llamaba `json.loads(body)` pero `json` solo estaba
+importado localmente como `_json` dentro del handler de WhatsApp (línea 604).
+Fix: se agrega `import json` a los imports globales del módulo.
+
 ## [0.6.6] - 2026-06-09
 
 ### Debug
