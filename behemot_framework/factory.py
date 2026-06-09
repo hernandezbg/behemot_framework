@@ -946,8 +946,9 @@ class BehemotFactory:
             try:
                 event = json.loads(body)
             except Exception as exc:
+                detail = f"Body no es JSON válido (len={len(body)}, err={exc!r})"
                 logger.error("handoff webhook json parse error: %s — body=%r", exc, body[:300])
-                raise HTTPException(status_code=400, detail="Body no es JSON válido")
+                raise HTTPException(status_code=400, detail=detail)
 
             event_type = event.get("event")
             session_id = event.get("session_id", "")

@@ -2,6 +2,18 @@
 
 Todas las mejoras y cambios importantes de Behemot Framework se documentan en este archivo.
 
+## [0.6.6] - 2026-06-09
+
+### Debug
+
+**Handoff webhook: error 400 incluye len(body) y excepción exacta**
+
+El mensaje de error 400 ahora es:
+`"Body no es JSON válido (len=0, err=JSONDecodeError(...))"`.
+Esto aparece directamente en el log del Celery task de behemot.net sin
+necesitar acceso a los logs del servidor. Si `len=0`, el body llega vacío
+(problema de proxy/transporte); si `len>0`, el error de parseo es visible.
+
 ## [0.6.5] - 2026-06-09
 
 ### Debug / diagnóstico
