@@ -2,6 +2,32 @@
 
 Todas las mejoras y cambios importantes de Behemot Framework se documentan en este archivo.
 
+## [0.6.8] - 2026-06-09
+
+### Features
+
+**Handoff: soporte de audio bidireccional**
+
+**Dirección 1 — WhatsApp → asesor (audio entrante):**
+
+Cuando un usuario en handoff envía un mensaje de voz, el framework ya no
+transcribe ni procesa el audio con el bot. En cambio:
+- Obtiene la URL autenticada del audio desde la API de WhatsApp
+  (`obtener_url_media(media_id)`) sin descargar el archivo.
+- Llama a `forward_message` con `type="audio"` y `media_url`.
+- Reenvía al endpoint `{session_id}/message/` de behemot.net:
+  `{"content": "[mensaje de voz]", "type": "audio", "media_url": "https://..."}`
+
+**Dirección 2 — asesor → WhatsApp (audio saliente):**
+
+Cuando behemot.net envía `{"event": "agent.message", "type": "audio", "media_url": "https://storage.googleapis.com/..."}`,
+el framework llama a `enviar_audio_por_url(to, media_url)` que usa el campo
+`"audio": {"link": url}` de la Cloud API para entregar el audio directamente
+al usuario de WhatsApp sin subida previa.
+
+**Retrocompatibilidad:** `forward_message` sin `msg_type` sigue enviando texto
+plano. Eventos `agent.message` sin campo `type` se tratan como texto.
+
 ## [0.6.7] - 2026-06-09
 
 ### Bug fix

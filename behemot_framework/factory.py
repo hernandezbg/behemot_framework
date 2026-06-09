@@ -656,10 +656,57 @@ class BehemotFactory:
                     logger.warning(f"Error registrando usuario WhatsApp {phone_number}: {e}")
                 
                 logger.info(f"Mensaje recibido de {phone_number}: tipo={mensaje['type']}")
-                
+
+                # --- Handoff intercept temprano (antes de transcripción) ---
+                # Intercepta tanto texto como audio; el bloque inferior sólo
+                # se ejecuta si NO estamos en handoff.
+                from behemot_framework.services.handoff_service import (
+                    is_enabled as _hoff_on, is_in_handoff, forward_message as _fwd_msg,
+                    is_trigger, start_handoff, build_history,
+                )
+                if _hoff_on():
+                    _uid = str(phone_number)
+                    if is_in_handoff(_uid):
+                        if mensaje["type"] == "text":
+                            await asyncio.to_thread(_fwd_msg, _uid, mensaje["content"])
+                        elif mensaje["type"] == "voice":
+                            _raw_msgs = value.get("messages", [{}])
+                            _audio_id = _raw_msgs[0].get("audio", {}).get("id", "") if _raw_msgs else ""
+                            _media_url = None
+                            if _audio_id:
+                                _media_url = await asyncio.to_thread(
+                                    self.whatsapp_connector.obtener_url_media, _audio_id
+                                )
+                            await asyncio.to_thread(
+                                _fwd_msg, _uid, "[mensaje de voz]", "audio", _media_url
+                            )
+                            # Limpiar archivo temporal descargado por extraer_mensaje
+                            _lpath = mensaje.get("content", "")
+                            if _lpath and os.path.isfile(_lpath):
+                                try:
+                                    os.remove(_lpath)
+                                except OSError:
+                                    pass
+                        return {"status": "ok"}
+                    _triggers = self.config.get("HANDOFF_TRIGGERS", [])
+                    if _triggers and mensaje["type"] == "text" and is_trigger(mensaje["content"], _triggers):
+                        _cb = self.config.get("HANDOFF_CALLBACK_URL", "").rstrip("/")
+                        if not _cb:
+                            logger.error("HANDOFF_CALLBACK_URL no configurado — no se puede iniciar handoff")
+                        else:
+                            await asyncio.to_thread(
+                                start_handoff, "whatsapp", _uid, _uid,
+                                f"{_cb}/handoff/webhook", build_history(_uid),
+                            )
+                        _msg = self.config.get("HANDOFF_START_MESSAGE",
+                                               "Te estamos conectando con un asesor, en breve te atienden.")
+                        self.whatsapp_connector.enviar_mensaje(phone_number, _msg)
+                        return {"status": "ok"}
+                # --- Fin handoff intercept ---
+
                 texto = None
                 imagen_path = None
-                
+
                 if mensaje["type"] == "text":
                     texto = mensaje["content"]
                     logger.info(f"Mensaje de texto: {texto[:50]}...")
@@ -669,7 +716,7 @@ class BehemotFactory:
                     logger.info(f"Transcribiendo audio de {phone_number}")
                     texto = self.transcriptor.transcribe_audio(audio_path)
                     logger.info(f"Audio transcrito: {texto[:50]}...")
-                    
+
                     # Limpiar archivo temporal
                     try:
                         os.remove(audio_path)
@@ -694,32 +741,6 @@ class BehemotFactory:
                     return {"status": "ok"}
                 
                 if texto:
-                    # --- Handoff check ---
-                    from behemot_framework.services.handoff_service import (
-                        is_enabled as _hoff_on, is_in_handoff, forward_message,
-                        is_trigger, start_handoff, build_history,
-                    )
-                    if _hoff_on():
-                        _uid = str(phone_number)
-                        if is_in_handoff(_uid):
-                            await asyncio.to_thread(forward_message, _uid, texto)
-                            return {"status": "ok"}
-                        _triggers = self.config.get("HANDOFF_TRIGGERS", [])
-                        if _triggers and is_trigger(texto, _triggers):
-                            _cb = self.config.get("HANDOFF_CALLBACK_URL", "").rstrip("/")
-                            if not _cb:
-                                logger.error("HANDOFF_CALLBACK_URL no configurado — no se puede iniciar handoff")
-                            else:
-                                await asyncio.to_thread(
-                                    start_handoff, "whatsapp", _uid, _uid,
-                                    f"{_cb}/handoff/webhook", build_history(_uid),
-                                )
-                            _msg = self.config.get("HANDOFF_START_MESSAGE",
-                                                   "Te estamos conectando con un asesor, en breve te atienden.")
-                            self.whatsapp_connector.enviar_mensaje(phone_number, _msg)
-                            return {"status": "ok"}
-                    # --- End handoff check ---
-
                     # Generar respuesta del asistente
                     logger.info(f"Generando respuesta para {phone_number}")
                     respuesta = await self.asistente.generar_respuesta(str(phone_number), texto, imagen_path)
@@ -973,9 +994,17 @@ class BehemotFactory:
 
             if event_type == "agent.message":
                 content    = event.get("content", "")
+                msg_type   = event.get("type", "text")
+                media_url  = event.get("media_url", "")
                 agent_name = event.get("agent_name", "Asesor")
-                logger.info("Handoff agent.message → %s (%s)", user_id, channel)
-                _send(content)
+                logger.info("Handoff agent.message type=%s → %s (%s)", msg_type, user_id, channel)
+                if msg_type == "audio" and media_url:
+                    if channel == "whatsapp" and self.whatsapp_connector:
+                        self.whatsapp_connector.enviar_audio_por_url(user_id, media_url)
+                    else:
+                        _send(content)  # fallback texto para otros canales
+                else:
+                    _send(content)
 
             elif event_type == "handoff.assigned":
                 agent_name = event.get("agent_name", "un asesor")

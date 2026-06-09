@@ -269,6 +269,42 @@ class WhatsAppConnector:
             logger.error(f"Excepción al subir audio a WhatsApp: {str(e)}")
             return None
 
+    def obtener_url_media(self, media_id: str) -> Optional[str]:
+        """Retorna la URL de descarga autenticada de un media de WhatsApp sin descargarlo."""
+        try:
+            resp = requests.get(
+                f"https://graph.facebook.com/v17.0/{media_id}",
+                headers={"Authorization": f"Bearer {self.token}"},
+            )
+            if resp.ok:
+                return resp.json().get("url")
+            logger.error("Error obteniendo URL de media %s: %s", media_id, resp.text)
+            return None
+        except Exception as e:
+            logger.error("Excepción obteniendo URL de media: %s", e)
+            return None
+
+    def enviar_audio_por_url(self, to: str, media_url: str) -> bool:
+        """Envía audio a WhatsApp usando una URL pública directa (ej. GCS)."""
+        endpoint = f"{self.base_url}/messages"
+        payload = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": to,
+            "type": "audio",
+            "audio": {"link": media_url},
+        }
+        try:
+            resp = requests.post(endpoint, headers=self.headers, json=payload)
+            if resp.ok:
+                logger.info("Audio por URL enviado a %s", to)
+                return True
+            logger.error("Error enviando audio por URL a %s: %s", to, resp.text)
+            return False
+        except Exception as e:
+            logger.error("Excepción enviando audio por URL a %s: %s", to, e)
+            return False
+
     def _enviar_audio(self, to: str, media_id: str) -> bool:
         """
         Envía un mensaje de audio usando un media_id previamente subido.

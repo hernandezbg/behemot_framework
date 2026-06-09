@@ -152,7 +152,12 @@ def start_handoff(
         return None
 
 
-def forward_message(user_id: str, content: str) -> bool:
+def forward_message(
+    user_id: str,
+    content: str,
+    msg_type: str = "text",
+    media_url: Optional[str] = None,
+) -> bool:
     """Reenvía un mensaje del usuario al asesor mientras el handoff está activo."""
     if not _enabled:
         return False
@@ -161,9 +166,14 @@ def forward_message(user_id: str, content: str) -> bool:
         return False
     session_id = data["session_id"]
     try:
+        payload: Dict = {"content": content}
+        if msg_type != "text":
+            payload["type"] = msg_type
+            if media_url:
+                payload["media_url"] = media_url
         resp = requests.post(
             f"{_webhook_url}{session_id}/message/",
-            json={"content": content},
+            json=payload,
             headers=_headers(),
             timeout=10,
         )
