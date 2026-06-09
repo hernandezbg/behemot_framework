@@ -243,6 +243,29 @@ class BehemotFactory:
                 return {"status": "ok"}
             
             if texto:
+                # --- Handoff check ---
+                from behemot_framework.services.handoff_service import (
+                    is_enabled as _hoff_on, is_in_handoff, forward_message,
+                    is_trigger, start_handoff, build_history,
+                )
+                if _hoff_on():
+                    _uid = str(chat_id)
+                    if is_in_handoff(_uid):
+                        await asyncio.to_thread(forward_message, _uid, texto)
+                        return {"status": "ok"}
+                    _triggers = self.config.get("HANDOFF_TRIGGERS", [])
+                    if _triggers and is_trigger(texto, _triggers):
+                        _cb = self.config.get("HANDOFF_CALLBACK_URL", "").rstrip("/")
+                        _sid = await asyncio.to_thread(
+                            start_handoff, "telegram", _uid, "",
+                            f"{_cb}/handoff/webhook", build_history(_uid),
+                        )
+                        _msg = self.config.get("HANDOFF_START_MESSAGE",
+                                               "Te estamos conectando con un asesor, en breve te atienden.")
+                        self.telegram_connector.enviar_mensaje(chat_id, _msg)
+                        return {"status": "ok"}
+                # --- End handoff check ---
+
                 self.telegram_connector.enviar_accion(chat_id, "typing")
                 respuesta = await self.asistente.generar_respuesta(str(chat_id), texto, imagen_path)
                 # Verificar si el conector tiene método procesar_respuesta
@@ -251,7 +274,7 @@ class BehemotFactory:
                 else:
                     # Fallback al método enviar_mensaje
                     self.telegram_connector.enviar_mensaje(chat_id, respuesta)
-            
+
             return {"status": "ok"}
         
         logger.info("Conector de Telegram configurado")
@@ -666,10 +689,33 @@ class BehemotFactory:
                     return {"status": "ok"}
                 
                 if texto:
+                    # --- Handoff check ---
+                    from behemot_framework.services.handoff_service import (
+                        is_enabled as _hoff_on, is_in_handoff, forward_message,
+                        is_trigger, start_handoff, build_history,
+                    )
+                    if _hoff_on():
+                        _uid = str(phone_number)
+                        if is_in_handoff(_uid):
+                            await asyncio.to_thread(forward_message, _uid, texto)
+                            return {"status": "ok"}
+                        _triggers = self.config.get("HANDOFF_TRIGGERS", [])
+                        if _triggers and is_trigger(texto, _triggers):
+                            _cb = self.config.get("HANDOFF_CALLBACK_URL", "").rstrip("/")
+                            await asyncio.to_thread(
+                                start_handoff, "whatsapp", _uid, "",
+                                f"{_cb}/handoff/webhook", build_history(_uid),
+                            )
+                            _msg = self.config.get("HANDOFF_START_MESSAGE",
+                                                   "Te estamos conectando con un asesor, en breve te atienden.")
+                            self.whatsapp_connector.enviar_mensaje(phone_number, _msg)
+                            return {"status": "ok"}
+                    # --- End handoff check ---
+
                     # Generar respuesta del asistente
                     logger.info(f"Generando respuesta para {phone_number}")
                     respuesta = await self.asistente.generar_respuesta(str(phone_number), texto, imagen_path)
-                    
+
                     # Enviar respuesta
                     logger.info(f"Enviando respuesta a {phone_number}")
                     await self.whatsapp_connector.procesar_respuesta(phone_number, respuesta, mensaje["type"])
@@ -864,6 +910,82 @@ class BehemotFactory:
         except Exception as e:
             logger.error(f"❌ Error al configurar interfaz de prueba local: {e}", exc_info=True)
 
+    def setup_handoff_webhook(self, fastapi_app: FastAPI) -> None:
+        """
+        Registra el endpoint POST /handoff/webhook que recibe eventos de behemot.net:
+        - agent.message   → reenviar al usuario por su canal
+        - handoff.assigned → notificar al usuario que el asesor tomó la conversación
+        - handoff.closed  → limpiar flag y reanudar el bot
+        """
+        from behemot_framework.services.handoff_service import (
+            verify_signature, get_user_id_by_session, clear_handoff,
+        )
+
+        @fastapi_app.post("/handoff/webhook")
+        async def handoff_webhook(request: Request):
+            body = await request.body()
+            sig  = request.headers.get("X-Behemot-Signature", "")
+            secret = self.config.get("HANDOFF_WEBHOOK_SECRET", "")
+
+            if not verify_signature(body, sig, secret):
+                raise HTTPException(status_code=401, detail="Firma inválida")
+
+            try:
+                event = json.loads(body)
+            except Exception:
+                raise HTTPException(status_code=400, detail="Body no es JSON válido")
+
+            event_type = event.get("event")
+            session_id = event.get("session_id", "")
+            user_id    = get_user_id_by_session(session_id)
+
+            if not user_id:
+                logger.warning("handoff webhook: session_id %s no encontrado en Redis", session_id)
+                return {"status": "ok"}
+
+            from behemot_framework.services.handoff_service import get_handoff_data
+            data    = get_handoff_data(user_id)
+            channel = data.get("channel", "") if data else ""
+
+            def _send(text: str):
+                if channel == "whatsapp" and self.whatsapp_connector:
+                    self.whatsapp_connector.enviar_mensaje(user_id, text)
+                elif channel == "telegram" and self.telegram_connector:
+                    self.telegram_connector.enviar_mensaje(user_id, text)
+                else:
+                    logger.warning("handoff webhook: no hay conector para canal '%s'", channel)
+
+            if event_type == "agent.message":
+                content    = event.get("content", "")
+                agent_name = event.get("agent_name", "Asesor")
+                logger.info("Handoff agent.message → %s (%s)", user_id, channel)
+                _send(content)
+
+            elif event_type == "handoff.assigned":
+                agent_name = event.get("agent_name", "un asesor")
+                msg = self.config.get(
+                    "HANDOFF_ASSIGNED_MESSAGE",
+                    f"Ya te atiende {agent_name}.",
+                )
+                logger.info("Handoff assigned → %s, asesor: %s", user_id, agent_name)
+                _send(msg)
+
+            elif event_type == "handoff.closed":
+                logger.info("Handoff closed → %s, retomando bot", user_id)
+                clear_handoff(user_id)
+                msg = self.config.get(
+                    "HANDOFF_CLOSED_MESSAGE",
+                    "El asesor cerró la conversación. Seguís con el asistente.",
+                )
+                _send(msg)
+
+            else:
+                logger.debug("handoff webhook: evento desconocido '%s'", event_type)
+
+            return {"status": "ok"}
+
+        logger.info("Endpoint /handoff/webhook registrado")
+
     def initialize_app(self, fastapi_app: FastAPI) -> None:
         """
         Inicializa la aplicación con configuraciones comunes.
@@ -1047,6 +1169,10 @@ class BehemotFactory:
                 logger.info("   http://localhost:7860 (o puerto disponible)")
                 logger.info("")
             
+        # Webhook de retorno desde behemot.net (handoff)
+        if self.config.get("HANDOFF_API_KEY"):
+            self.setup_handoff_webhook(fastapi_app)
+
         # Configurar rutas básicas
         @fastapi_app.get("/")
         async def root():
@@ -1101,6 +1227,13 @@ def create_behemot_app(
     # valor sobrescribe ENABLE_VOICE del config. Esto evita la sorpresa de
     # que la flag de Python sea ignorada por un default heredado.
     config["ENABLE_VOICE"] = bool(enable_voice)
+
+    # Handoff: inicializar si las claves están configuradas
+    _hoff_key = config.get("HANDOFF_API_KEY", "")
+    _hoff_url = config.get("HANDOFF_WEBHOOK_URL", "")
+    if _hoff_key and _hoff_url:
+        from behemot_framework.services.handoff_service import init_handoff
+        init_handoff(api_key=_hoff_key, webhook_url=_hoff_url)
 
     # Observabilidad: inicializar Langfuse si las claves están configuradas
     _lf_secret = config.get("LANGFUSE_SECRET_KEY", "")

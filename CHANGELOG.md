@@ -2,6 +2,48 @@
 
 Todas las mejoras y cambios importantes de Behemot Framework se documentan en este archivo.
 
+## [0.6.1] - 2026-06-09
+
+### Nuevas funcionalidades
+
+**Human Handoff — integración con behemot.net**
+
+Cuando un usuario solicita hablar con un asesor humano, el framework pausa el
+bot para ese usuario y deriva la conversación a la bandeja de behemot.net.
+
+**Activación mínima:**
+```yaml
+HANDOFF_API_KEY:      "bh-live-xxxx"
+HANDOFF_WEBHOOK_URL:  "https://behemot.net/api/v1/handoff/"
+HANDOFF_CALLBACK_URL: "https://mi-agente.railway.app"
+HANDOFF_TRIGGERS:
+  - "quiero hablar con una persona"
+  - "asesor"
+  - "hablar con humano"
+```
+
+**Flujo:**
+1. Usuario escribe una frase del listado `HANDOFF_TRIGGERS`
+2. Framework llama `POST /handoff/start` en behemot.net con el historial
+3. Bot se pausa para ese usuario (flag en Redis con TTL de 24h)
+4. Mensajes nuevos del usuario se reenvían al asesor vía `POST /handoff/{id}/message`
+5. Asesor responde desde la bandeja → behemot.net llama `POST /handoff/webhook` del framework
+6. Framework reenvía la respuesta al usuario por WhatsApp/Telegram
+7. Cuando el asesor cierra, bot se retoma automáticamente
+
+**Mensajes configurables:**
+- `HANDOFF_START_MESSAGE`: al iniciar el handoff
+- `HANDOFF_ASSIGNED_MESSAGE`: cuando el asesor toma la conversación
+- `HANDOFF_CLOSED_MESSAGE`: cuando el asesor cierra
+
+**Archivos nuevos/modificados:**
+- `services/handoff_service.py` — cliente HTTP a behemot.net + estado en Redis
+- `factory.py` — handoff check en handlers de WhatsApp y Telegram +
+  endpoint `POST /handoff/webhook` para recibir eventos de behemot.net
+- `config.py` — nuevas claves `HANDOFF_*`
+
+Sin las claves configuradas el comportamiento es idéntico al anterior.
+
 ## [0.6.0] - 2026-06-08
 
 ### Nuevas funcionalidades

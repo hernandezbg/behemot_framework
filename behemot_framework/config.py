@@ -187,6 +187,32 @@ class Config:
             "API_MAX_REQUEST_SIZE": int(os.getenv("API_MAX_REQUEST_SIZE", str(10 * 1024 * 1024))),
             "API_MAX_AUDIO_SIZE": int(os.getenv("API_MAX_AUDIO_SIZE", str(25 * 1024 * 1024))),
             
+            # Human Handoff (opcional).
+            # Conecta el framework con behemot.net para derivar usuarios a asesores humanos.
+            # Sin estas claves, el handoff está deshabilitado y el bot responde normalmente.
+            "HANDOFF_API_KEY": os.getenv("HANDOFF_API_KEY", ""),
+            "HANDOFF_WEBHOOK_URL": os.getenv("HANDOFF_WEBHOOK_URL", ""),
+            # URL pública del framework (usada como callback URL al registrar el handoff)
+            "HANDOFF_CALLBACK_URL": os.getenv("HANDOFF_CALLBACK_URL", ""),
+            # Secret para verificar firma HMAC de webhooks entrantes de behemot.net
+            "HANDOFF_WEBHOOK_SECRET": os.getenv("HANDOFF_WEBHOOK_SECRET", ""),
+            # Frases que activan el handoff. Ej: ["quiero hablar con una persona", "asesor"]
+            "HANDOFF_TRIGGERS": (
+                [p.strip() for p in os.getenv("HANDOFF_TRIGGERS", "").split(",") if p.strip()]
+                if os.getenv("HANDOFF_TRIGGERS")
+                else []
+            ),
+            # Mensajes automáticos al usuario en cada etapa del handoff
+            "HANDOFF_START_MESSAGE": os.getenv(
+                "HANDOFF_START_MESSAGE",
+                "Te estamos conectando con un asesor, en breve te atienden.",
+            ),
+            "HANDOFF_ASSIGNED_MESSAGE": os.getenv("HANDOFF_ASSIGNED_MESSAGE", ""),
+            "HANDOFF_CLOSED_MESSAGE": os.getenv(
+                "HANDOFF_CLOSED_MESSAGE",
+                "El asesor cerró la conversación. Seguís con el asistente.",
+            ),
+
             # Observabilidad con Langfuse (opcional).
             # Si LANGFUSE_SECRET_KEY y LANGFUSE_PUBLIC_KEY están configuradas,
             # cada turno del agente genera un trace en Langfuse.
