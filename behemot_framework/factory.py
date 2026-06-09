@@ -257,10 +257,13 @@ class BehemotFactory:
                     _triggers = self.config.get("HANDOFF_TRIGGERS", [])
                     if _triggers and is_trigger(texto, _triggers):
                         _cb = self.config.get("HANDOFF_CALLBACK_URL", "").rstrip("/")
-                        _sid = await asyncio.to_thread(
-                            start_handoff, "telegram", _uid, "",
-                            f"{_cb}/handoff/webhook", build_history(_uid),
-                        )
+                        if not _cb:
+                            logger.error("HANDOFF_CALLBACK_URL no configurado — no se puede iniciar handoff")
+                        else:
+                            await asyncio.to_thread(
+                                start_handoff, "telegram", _uid, _uid,
+                                f"{_cb}/handoff/webhook", build_history(_uid),
+                            )
                         _msg = self.config.get("HANDOFF_START_MESSAGE",
                                                "Te estamos conectando con un asesor, en breve te atienden.")
                         self.telegram_connector.enviar_mensaje(chat_id, _msg)
@@ -703,10 +706,13 @@ class BehemotFactory:
                         _triggers = self.config.get("HANDOFF_TRIGGERS", [])
                         if _triggers and is_trigger(texto, _triggers):
                             _cb = self.config.get("HANDOFF_CALLBACK_URL", "").rstrip("/")
-                            await asyncio.to_thread(
-                                start_handoff, "whatsapp", _uid, "",
-                                f"{_cb}/handoff/webhook", build_history(_uid),
-                            )
+                            if not _cb:
+                                logger.error("HANDOFF_CALLBACK_URL no configurado — no se puede iniciar handoff")
+                            else:
+                                await asyncio.to_thread(
+                                    start_handoff, "whatsapp", _uid, _uid,
+                                    f"{_cb}/handoff/webhook", build_history(_uid),
+                                )
                             _msg = self.config.get("HANDOFF_START_MESSAGE",
                                                    "Te estamos conectando con un asesor, en breve te atienden.")
                             self.whatsapp_connector.enviar_mensaje(phone_number, _msg)

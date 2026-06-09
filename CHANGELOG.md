@@ -2,6 +2,23 @@
 
 Todas las mejoras y cambios importantes de Behemot Framework se documentan en este archivo.
 
+## [0.6.4] - 2026-06-09
+
+### Bug fixes
+
+**Handoff: user_name vacío y framework_webhook_url inválida**
+
+Dos errores en el mismo call a `start_handoff` en factory.py:
+
+- `user_name=""` causaba validación 400 en behemot.net. Fix: se usa `_uid`
+  (número de teléfono / chat_id) como fallback cuando no hay nombre disponible.
+- `HANDOFF_CALLBACK_URL` vacío generaba `framework_webhook_url="/handoff/webhook"`
+  (URL relativa inválida). Fix: si `HANDOFF_CALLBACK_URL` no está configurado se
+  loguea un error claro y se omite el call a behemot.net; el mensaje de handoff
+  se envía igual al usuario para no dejarlo sin respuesta.
+
+Ambos fixes aplicados en los handlers de WhatsApp y Telegram.
+
 ## [0.6.3] - 2026-06-09
 
 ### Bug fix
