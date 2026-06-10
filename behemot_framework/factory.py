@@ -711,8 +711,12 @@ class BehemotFactory:
                         if not _cb:
                             logger.error("HANDOFF_CALLBACK_URL no configurado — no se puede iniciar handoff")
                         else:
+                            _wa_name = ""
+                            if "contacts" in value and value["contacts"]:
+                                _wa_name = value["contacts"][0].get("profile", {}).get("name", "") or ""
+                            _display = f"{_wa_name} ({_uid})" if _wa_name else _uid
                             await asyncio.to_thread(
-                                start_handoff, "whatsapp", _uid, _uid,
+                                start_handoff, "whatsapp", _uid, _display,
                                 f"{_cb}/handoff/webhook", build_history(_uid),
                             )
                         _msg = self.config.get("HANDOFF_START_MESSAGE",

@@ -2,6 +2,17 @@
 
 Todas las mejoras y cambios importantes de Behemot Framework se documentan en este archivo.
 
+## [0.6.10] - 2026-06-10
+
+### Fix
+
+**Handoff: user_name incluye nombre del perfil WhatsApp**
+
+`start_handoff` recibía `_uid` (solo el número) como `user_name`.
+Ahora extrae `contacts[0].profile.name` del payload de WhatsApp y
+construye `"Juan Pérez (5491134567890)"`. Si el perfil no tiene nombre,
+mantiene el número como fallback. `user_id` interno no cambia.
+
 ## [0.6.9] - 2026-06-09
 
 ### Features
