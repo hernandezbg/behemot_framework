@@ -2,6 +2,22 @@
 
 Todas las mejoras y cambios importantes de Behemot Framework se documentan en este archivo.
 
+## [0.6.9] - 2026-06-09
+
+### Features
+
+**Handoff: soporte imagen bidireccional**
+
+Mismo patrón que audio (v0.6.8), extendido a imágenes:
+
+- **Entrante** (usuario → asesor): imagen durante handoff obtiene la URL
+  autenticada vía `obtener_url_media()` y reenvía con `type="image"` y
+  el caption como `content`. Limpia el archivo local ya descargado.
+- **Saliente** (asesor → usuario): evento `agent.message` con `type="image"`
+  usa `enviar_imagen_por_url(to, url, caption)` para entregar la imagen
+  con su caption vía Cloud API.
+- Nuevo método `enviar_imagen_por_url()` en `WhatsAppConnector`.
+
 ## [0.6.8] - 2026-06-09
 
 ### Features

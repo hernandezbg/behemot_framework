@@ -305,6 +305,26 @@ class WhatsAppConnector:
             logger.error("Excepción enviando audio por URL a %s: %s", to, e)
             return False
 
+    def enviar_imagen_por_url(self, to: str, media_url: str, caption: str = "") -> bool:
+        """Envía una imagen a WhatsApp usando una URL pública (ej. GCS)."""
+        payload = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": to,
+            "type": "image",
+            "image": {"link": media_url, "caption": caption},
+        }
+        try:
+            resp = requests.post(f"{self.base_url}/messages", headers=self.headers, json=payload)
+            if resp.ok:
+                logger.info("Imagen por URL enviada a %s", to)
+                return True
+            logger.error("Error enviando imagen por URL a %s: %s", to, resp.text)
+            return False
+        except Exception as e:
+            logger.error("Excepción enviando imagen por URL a %s: %s", to, e)
+            return False
+
     def _enviar_audio(self, to: str, media_id: str) -> bool:
         """
         Envía un mensaje de audio usando un media_id previamente subido.

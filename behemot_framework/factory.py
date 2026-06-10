@@ -680,7 +680,24 @@ class BehemotFactory:
                             await asyncio.to_thread(
                                 _fwd_msg, _uid, "[mensaje de voz]", "audio", _media_url
                             )
-                            # Limpiar archivo temporal descargado por extraer_mensaje
+                            _lpath = mensaje.get("content", "")
+                            if _lpath and os.path.isfile(_lpath):
+                                try:
+                                    os.remove(_lpath)
+                                except OSError:
+                                    pass
+                        elif mensaje["type"] == "image":
+                            _raw_msgs = value.get("messages", [{}])
+                            _image_id = _raw_msgs[0].get("image", {}).get("id", "") if _raw_msgs else ""
+                            _caption = _raw_msgs[0].get("image", {}).get("caption", "") if _raw_msgs else ""
+                            _media_url = None
+                            if _image_id:
+                                _media_url = await asyncio.to_thread(
+                                    self.whatsapp_connector.obtener_url_media, _image_id
+                                )
+                            await asyncio.to_thread(
+                                _fwd_msg, _uid, _caption or "[imagen]", "image", _media_url
+                            )
                             _lpath = mensaje.get("content", "")
                             if _lpath and os.path.isfile(_lpath):
                                 try:
@@ -1002,7 +1019,12 @@ class BehemotFactory:
                     if channel == "whatsapp" and self.whatsapp_connector:
                         self.whatsapp_connector.enviar_audio_por_url(user_id, media_url)
                     else:
-                        _send(content)  # fallback texto para otros canales
+                        _send(content)
+                elif msg_type == "image" and media_url:
+                    if channel == "whatsapp" and self.whatsapp_connector:
+                        self.whatsapp_connector.enviar_imagen_por_url(user_id, media_url, content)
+                    else:
+                        _send(content or "[imagen]")
                 else:
                     _send(content)
 
