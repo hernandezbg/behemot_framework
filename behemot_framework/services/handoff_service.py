@@ -119,6 +119,7 @@ def start_handoff(
     user_name: str,
     framework_webhook_url: str,
     history: list,
+    user_avatar: Optional[str] = None,
 ) -> Optional[str]:
     """
     Registra una nueva sesión de handoff en behemot.net.
@@ -131,6 +132,7 @@ def start_handoff(
             "channel": channel,
             "user_id": user_id,
             "user_name": user_name or "",
+            "user_avatar": user_avatar,
             "framework_webhook_url": framework_webhook_url,
             "history": history,
         }

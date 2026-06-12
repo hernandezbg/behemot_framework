@@ -2,6 +2,20 @@
 
 Todas las mejoras y cambios importantes de Behemot Framework se documentan en este archivo.
 
+## [0.6.11] - 2026-06-12
+
+### Feature
+
+**Handoff: campo `user_avatar` en payload de start_handoff**
+
+`start_handoff()` acepta nuevo parámetro opcional `user_avatar: str = None`.
+Se incluye siempre en el payload enviado a behemot.net (null si no se provee).
+Retrocompatible: los calls existentes no necesitan cambios. Si behemot.net
+recibe null, muestra iniciales como fallback.
+
+Obtener la foto de perfil real de WhatsApp requiere una llamada adicional a
+la Cloud API que es poco confiable — se deja como extensión futura por canal.
+
 ## [0.6.10] - 2026-06-10
 
 ### Fix
