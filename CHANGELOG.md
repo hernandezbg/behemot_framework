@@ -2,6 +2,22 @@
 
 Todas las mejoras y cambios importantes de Behemot Framework se documentan en este archivo.
 
+## [0.6.12] - 2026-06-12
+
+### Bug fix
+
+**Handoff: trigger funciona con mensajes de voz**
+
+El trigger de handoff solo evaluaba mensajes de texto. Si el usuario enviaba
+un audio diciendo "quiero hablar con un asesor", la derivación no se
+disparaba.
+
+Fix: en el trigger check, si el mensaje es de voz y hay transcriptor
+disponible, se transcribe el audio primero y se evalúa el texto resultante
+contra los triggers. La transcripción se reutiliza en el flujo normal del bot
+(variable `_pre_transcribed`) para evitar doble transcripción si el audio
+no era un trigger.
+
 ## [0.6.11] - 2026-06-12
 
 ### Feature

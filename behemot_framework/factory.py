@@ -657,6 +657,8 @@ class BehemotFactory:
                 
                 logger.info(f"Mensaje recibido de {phone_number}: tipo={mensaje['type']}")
 
+                _pre_transcribed = None  # reutilizado si el audio se transcribe durante el trigger check
+
                 # --- Handoff intercept temprano (antes de transcripción) ---
                 # Intercepta tanto texto como audio; el bloque inferior sólo
                 # se ejecuta si NO estamos en handoff.
@@ -706,23 +708,41 @@ class BehemotFactory:
                                     pass
                         return {"status": "ok"}
                     _triggers = self.config.get("HANDOFF_TRIGGERS", [])
-                    if _triggers and mensaje["type"] == "text" and is_trigger(mensaje["content"], _triggers):
-                        _cb = self.config.get("HANDOFF_CALLBACK_URL", "").rstrip("/")
-                        if not _cb:
-                            logger.error("HANDOFF_CALLBACK_URL no configurado — no se puede iniciar handoff")
-                        else:
-                            _wa_name = ""
-                            if "contacts" in value and value["contacts"]:
-                                _wa_name = value["contacts"][0].get("profile", {}).get("name", "") or ""
-                            _display = f"{_wa_name} ({_uid})" if _wa_name else _uid
-                            await asyncio.to_thread(
-                                start_handoff, "whatsapp", _uid, _display,
-                                f"{_cb}/handoff/webhook", build_history(_uid),
-                            )
-                        _msg = self.config.get("HANDOFF_START_MESSAGE",
-                                               "Te estamos conectando con un asesor, en breve te atienden.")
-                        self.whatsapp_connector.enviar_mensaje(phone_number, _msg)
-                        return {"status": "ok"}
+                    if _triggers:
+                        _trigger_text = None
+                        if mensaje["type"] == "text":
+                            _trigger_text = mensaje["content"]
+                        elif mensaje["type"] == "voice" and self.transcriptor:
+                            _audio_path = mensaje.get("content", "")
+                            if _audio_path:
+                                _pre_transcribed = await asyncio.to_thread(
+                                    self.transcriptor.transcribe_audio, _audio_path
+                                )
+                                _trigger_text = _pre_transcribed
+                                logger.info("Audio transcrito para verificar trigger: %s...", (_trigger_text or "")[:50])
+                        if _trigger_text and is_trigger(_trigger_text, _triggers):
+                            _cb = self.config.get("HANDOFF_CALLBACK_URL", "").rstrip("/")
+                            if not _cb:
+                                logger.error("HANDOFF_CALLBACK_URL no configurado — no se puede iniciar handoff")
+                            else:
+                                _wa_name = ""
+                                if "contacts" in value and value["contacts"]:
+                                    _wa_name = value["contacts"][0].get("profile", {}).get("name", "") or ""
+                                _display = f"{_wa_name} ({_uid})" if _wa_name else _uid
+                                await asyncio.to_thread(
+                                    start_handoff, "whatsapp", _uid, _display,
+                                    f"{_cb}/handoff/webhook", build_history(_uid),
+                                )
+                            # Limpiar temp si se transcribió el audio
+                            if _pre_transcribed and mensaje.get("content") and os.path.isfile(mensaje["content"]):
+                                try:
+                                    os.remove(mensaje["content"])
+                                except OSError:
+                                    pass
+                            _msg = self.config.get("HANDOFF_START_MESSAGE",
+                                                   "Te estamos conectando con un asesor, en breve te atienden.")
+                            self.whatsapp_connector.enviar_mensaje(phone_number, _msg)
+                            return {"status": "ok"}
                 # --- Fin handoff intercept ---
 
                 texto = None
@@ -732,13 +752,13 @@ class BehemotFactory:
                     texto = mensaje["content"]
                     logger.info(f"Mensaje de texto: {texto[:50]}...")
                 elif mensaje["type"] == "voice" and self.transcriptor:
-                    # Transcribir audio a texto
                     audio_path = mensaje["content"]
-                    logger.info(f"Transcribiendo audio de {phone_number}")
-                    texto = self.transcriptor.transcribe_audio(audio_path)
-                    logger.info(f"Audio transcrito: {texto[:50]}...")
-
-                    # Limpiar archivo temporal
+                    if _pre_transcribed is not None:
+                        texto = _pre_transcribed
+                    else:
+                        logger.info(f"Transcribiendo audio de {phone_number}")
+                        texto = self.transcriptor.transcribe_audio(audio_path)
+                        logger.info(f"Audio transcrito: {texto[:50]}...")
                     try:
                         os.remove(audio_path)
                         logger.debug(f"Archivo temporal eliminado: {audio_path}")
