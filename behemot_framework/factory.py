@@ -729,9 +729,11 @@ class BehemotFactory:
                                 if "contacts" in value and value["contacts"]:
                                     _wa_name = value["contacts"][0].get("profile", {}).get("name", "") or ""
                                 _display = f"{_wa_name} ({_uid})" if _wa_name else _uid
+                                _history = build_history(_uid)
+                                _history.append({"role": "user", "content": _trigger_text})
                                 await asyncio.to_thread(
                                     start_handoff, "whatsapp", _uid, _display,
-                                    f"{_cb}/handoff/webhook", build_history(_uid),
+                                    f"{_cb}/handoff/webhook", _history,
                                 )
                             # Limpiar temp si se transcribió el audio
                             if _pre_transcribed and mensaje.get("content") and os.path.isfile(mensaje["content"]):

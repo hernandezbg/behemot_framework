@@ -2,6 +2,20 @@
 
 Todas las mejoras y cambios importantes de Behemot Framework se documentan en este archivo.
 
+## [0.6.13] - 2026-06-12
+
+### Bug fix
+
+**Handoff: mensaje trigger incluido en el historial enviado a behemot.net**
+
+`build_history()` lee desde Redis, pero `save_conversation()` solo escribe
+después de que el asistente genera una respuesta. El mensaje que disparó el
+handoff ("quiero hablar con un asesor") nunca llegaba al historial porque
+el flujo salteaba al asistente.
+
+Fix: se agrega el `_trigger_text` manualmente al final del historial antes
+de pasarlo a `start_handoff()`. No modifica Redis.
+
 ## [0.6.12] - 2026-06-12
 
 ### Bug fix
