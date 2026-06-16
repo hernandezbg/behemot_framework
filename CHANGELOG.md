@@ -2,6 +2,21 @@
 
 Todas las mejoras y cambios importantes de Behemot Framework se documentan en este archivo.
 
+## [0.6.18] - 2026-06-16
+
+### Bug fix
+
+**WhatsApp: estructura de cada card en carrusel interactivo incorrecta**
+
+El error de Meta indicaba tres problemas en cada card:
+  - Faltaba `card_index` (índice de la card)
+  - Faltaba `type: "image"`
+  - Los botones iban sueltos en la card; deben ir dentro de `action`
+  - `footer` no está permitido en cards de carrusel interactivo
+
+Fix: cada card ahora tiene `card_index`, `type`, y `buttons` dentro de `action`.
+Se eliminó el campo `footer` del método.
+
 ## [0.6.17] - 2026-06-16
 
 ### Bug fix

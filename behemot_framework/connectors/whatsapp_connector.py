@@ -433,8 +433,11 @@ class WhatsAppConnector:
             return False
 
         api_cards = []
-        for card in cards[:10]:
-            api_card: Dict[str, Any] = {}
+        for idx, card in enumerate(cards[:10]):
+            api_card: Dict[str, Any] = {
+                "card_index": idx,
+                "type": "image",
+            }
 
             imagen_url = card.get("imagen_url", "")
             if imagen_url:
@@ -443,10 +446,6 @@ class WhatsAppConnector:
             texto = card.get("texto", "")
             if texto:
                 api_card["body"] = {"text": texto}
-
-            footer = card.get("footer", "")
-            if footer:
-                api_card["footer"] = {"text": footer}
 
             buttons = []
             for btn in card.get("botones", [])[:2]:
@@ -467,7 +466,7 @@ class WhatsAppConnector:
                         },
                     })
             if buttons:
-                api_card["buttons"] = buttons
+                api_card["action"] = {"buttons": buttons}
 
             api_cards.append(api_card)
 
