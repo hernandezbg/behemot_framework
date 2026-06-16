@@ -406,6 +406,93 @@ class WhatsAppConnector:
             logger.error("Excepción enviando carrusel a %s: %s", to, e)
             return False
 
+    def enviar_carrusel_interactivo(
+        self,
+        to: str,
+        cards: list,
+        body_text: str = "",
+    ) -> bool:
+        """
+        Envía un carrusel horizontal de productos sin necesidad de template aprobado.
+
+        Cada dict en `cards` debe tener:
+          - imagen_url  (str)        : URL pública de la imagen del header
+          - texto       (str)        : descripción de la tarjeta (body)
+          - footer      (str)        : texto de pie opcional
+          - botones     (list[dict]) : hasta 2 botones, cada uno con:
+              {"titulo": "Contratar", "id": "CONTRATAR_1"}   → quick reply
+              {"titulo": "Ver más",   "url": "https://..."}  → botón URL (cta_url)
+
+        No requiere template: el contenido es 100% dinámico.
+        Puede requerir que la cuenta de WhatsApp Business tenga habilitado
+        el capability de Interactive Carousel (no disponible en todas las cuentas).
+        Máximo 10 cards por mensaje (límite de WhatsApp).
+        """
+        if not cards:
+            logger.warning("enviar_carrusel_interactivo: se llamó sin cards, noop")
+            return False
+
+        api_cards = []
+        for card in cards[:10]:
+            api_card: Dict[str, Any] = {}
+
+            imagen_url = card.get("imagen_url", "")
+            if imagen_url:
+                api_card["header"] = {"type": "image", "image": {"link": imagen_url}}
+
+            texto = card.get("texto", "")
+            if texto:
+                api_card["body"] = {"text": texto}
+
+            footer = card.get("footer", "")
+            if footer:
+                api_card["footer"] = {"text": footer}
+
+            buttons = []
+            for btn in card.get("botones", [])[:2]:
+                if btn.get("url"):
+                    buttons.append({
+                        "type": "cta_url",
+                        "cta_url": {
+                            "display_text": btn.get("titulo", "Ver más"),
+                            "url": btn["url"],
+                        },
+                    })
+                else:
+                    buttons.append({
+                        "type": "reply",
+                        "reply": {
+                            "id": btn.get("id", "BTN"),
+                            "title": btn.get("titulo", ""),
+                        },
+                    })
+            if buttons:
+                api_card["buttons"] = buttons
+
+            api_cards.append(api_card)
+
+        interactive: Dict[str, Any] = {"type": "carousel", "cards": api_cards}
+        if body_text:
+            interactive["body"] = {"text": body_text}
+
+        payload = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": to,
+            "type": "interactive",
+            "interactive": interactive,
+        }
+        try:
+            resp = requests.post(f"{self.base_url}/messages", headers=self.headers, json=payload)
+            if resp.ok:
+                logger.info("Carrusel interactivo enviado a %s (cards=%d)", to, len(api_cards))
+                return True
+            logger.error("Error enviando carrusel interactivo a %s: %s %s", to, resp.status_code, resp.text)
+            return False
+        except Exception as e:
+            logger.error("Excepción enviando carrusel interactivo a %s: %s", to, e)
+            return False
+
     def _enviar_audio(self, to: str, media_id: str) -> bool:
         """
         Envía un mensaje de audio usando un media_id previamente subido.

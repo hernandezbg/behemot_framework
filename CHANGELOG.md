@@ -2,6 +2,18 @@
 
 Todas las mejoras y cambios importantes de Behemot Framework se documentan en este archivo.
 
+## [0.6.15] - 2026-06-16
+
+### Feature
+
+**WhatsApp: carrusel interactivo sin template (`enviar_carrusel_interactivo`)**
+
+Nuevo método complementario al carrusel de template. No requiere template
+aprobado en Meta: el contenido (imagen, texto, botones) se define en tiempo
+de ejecución. Cada card acepta `imagen_url`, `texto`, `footer` y `botones`
+(quick reply o cta_url). Puede requerir que la cuenta de WhatsApp Business
+tenga habilitado el capability de Interactive Carousel.
+
 ## [0.6.14] - 2026-06-16
 
 ### Feature
