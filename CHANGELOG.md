@@ -2,6 +2,20 @@
 
 Todas las mejoras y cambios importantes de Behemot Framework se documentan en este archivo.
 
+## [0.6.22] - 2026-06-16
+
+### Feature
+
+**WhatsApp: manejo de button_reply de carrusel interactivo**
+
+Cuando el usuario toca un botón quick_reply de un carrusel, WhatsApp envía
+un webhook con `type: "interactive"` y `interactive.type: "button_reply"`.
+El handler ignoraba estos mensajes.
+
+Fix: `extraer_mensaje()` ahora detecta `button_reply` y extrae el `id` del
+botón como texto del mensaje, de modo que llega al asistente como si el
+usuario hubiera escrito ese payload.
+
 ## [0.6.21] - 2026-06-16
 
 ### Bug fix

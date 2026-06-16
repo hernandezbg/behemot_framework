@@ -86,6 +86,14 @@ class WhatsAppConnector:
                             "caption": caption
                         }
 
+            elif message_type == "interactive":
+                interactive = message.get("interactive", {})
+                if interactive.get("type") == "button_reply":
+                    btn = interactive.get("button_reply", {})
+                    payload = btn.get("id", "")
+                    if payload:
+                        return sender, {"type": "text", "content": payload}
+
             elif message_type == "location":
                 location = message.get("location", {})
                 lat = location.get("latitude")
