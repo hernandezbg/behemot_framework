@@ -2,6 +2,16 @@
 
 Todas las mejoras y cambios importantes de Behemot Framework se documentan en este archivo.
 
+## [0.6.21] - 2026-06-16
+
+### Bug fix
+
+**WhatsApp: objeto interno del botón quick_reply debe llamarse quick_reply**
+
+Meta exige que la clave del objeto interno coincida con el type:
+`{"type": "quick_reply", "reply": {...}}` → rechazado
+`{"type": "quick_reply", "quick_reply": {...}}` → correcto
+
 ## [0.6.20] - 2026-06-16
 
 ### Bug fix

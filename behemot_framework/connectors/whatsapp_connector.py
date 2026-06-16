@@ -455,7 +455,7 @@ class WhatsAppConnector:
                     continue
                 buttons.append({
                     "type": "quick_reply",
-                    "reply": {
+                    "quick_reply": {
                         "id": btn.get("id", "BTN"),
                         "title": btn.get("titulo", ""),
                     },
