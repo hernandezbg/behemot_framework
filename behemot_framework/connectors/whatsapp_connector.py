@@ -471,7 +471,7 @@ class WhatsAppConnector:
 
             api_cards.append(api_card)
 
-        interactive: Dict[str, Any] = {"type": "carousel", "cards": api_cards}
+        interactive: Dict[str, Any] = {"type": "carousel", "action": {"cards": api_cards}}
         if body_text:
             interactive["body"] = {"text": body_text}
 

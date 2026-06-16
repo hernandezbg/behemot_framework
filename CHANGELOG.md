@@ -2,6 +2,18 @@
 
 Todas las mejoras y cambios importantes de Behemot Framework se documentan en este archivo.
 
+## [0.6.17] - 2026-06-16
+
+### Bug fix
+
+**WhatsApp: carrusel interactivo devolvía 400 por estructura JSON incorrecta**
+
+Meta exige que `cards` esté bajo `interactive.action`, no suelto bajo
+`interactive`. El error era:
+`"missing: 'action', Unexpected key 'cards' on param 'interactive'"`
+
+Fix: `{"type": "carousel", "cards": [...]}` → `{"type": "carousel", "action": {"cards": [...]}}`
+
 ## [0.6.16] - 2026-06-16
 
 ### Feature
