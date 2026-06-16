@@ -2,6 +2,20 @@
 
 Todas las mejoras y cambios importantes de Behemot Framework se documentan en este archivo.
 
+## [0.6.20] - 2026-06-16
+
+### Bug fix
+
+**WhatsApp: botones de carrusel interactivo deben ser quick_reply; cta_url no permitido**
+
+Meta exige `"type": "quick_reply"` en los botones de cards de carrusel
+interactivo. El tipo `"reply"` y los botones `cta_url` son rechazados
+con error 131009.
+
+Cambios:
+  - `"type": "reply"` → `"type": "quick_reply"`
+  - Botones con `url` se ignoran silenciosamente (Meta no los admite en carruseles)
+
 ## [0.6.19] - 2026-06-16
 
 ### Bug fix

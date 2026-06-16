@@ -450,21 +450,16 @@ class WhatsAppConnector:
             buttons = []
             for btn in card.get("botones", [])[:2]:
                 if btn.get("url"):
-                    buttons.append({
-                        "type": "cta_url",
-                        "cta_url": {
-                            "display_text": btn.get("titulo", "Ver más"),
-                            "url": btn["url"],
-                        },
-                    })
-                else:
-                    buttons.append({
-                        "type": "reply",
-                        "reply": {
-                            "id": btn.get("id", "BTN"),
-                            "title": btn.get("titulo", ""),
-                        },
-                    })
+                    # Meta no acepta cta_url dentro de cards de carrusel interactivo
+                    logger.debug("cta_url ignorado en carrusel interactivo (no soportado por Meta)")
+                    continue
+                buttons.append({
+                    "type": "quick_reply",
+                    "reply": {
+                        "id": btn.get("id", "BTN"),
+                        "title": btn.get("titulo", ""),
+                    },
+                })
             if buttons:
                 api_card["action"] = {"buttons": buttons}
 
