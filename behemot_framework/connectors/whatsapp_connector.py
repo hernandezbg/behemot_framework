@@ -325,6 +325,87 @@ class WhatsAppConnector:
             logger.error("Excepción enviando imagen por URL a %s: %s", to, e)
             return False
 
+    def enviar_carrusel_template(
+        self,
+        to: str,
+        template_name: str,
+        cards: list,
+        language: str = "es",
+    ) -> bool:
+        """
+        Envía un carrusel horizontal de productos vía template aprobado en Meta Business Manager.
+
+        Cada dict en `cards` debe tener:
+          - imagen_url  (str)        : URL pública de la imagen del header
+          - variables   (list[str])  : variables del body en el mismo orden que el template
+          - botones     (list[dict]) : hasta 2 botones, cada uno con:
+              {"tipo": "quick_reply", "payload": "PAYLOAD_VALUE"}
+              {"tipo": "url",         "url":     "https://..."}
+
+        Requiere un template de tipo 'carousel' aprobado en Meta Business Manager.
+        Máximo 10 cards por mensaje (límite de WhatsApp).
+        """
+        if not cards:
+            logger.warning("enviar_carrusel_template: se llamó sin cards, noop")
+            return False
+
+        api_cards = []
+        for idx, card in enumerate(cards[:10]):
+            components = []
+
+            imagen_url = card.get("imagen_url", "")
+            if imagen_url:
+                components.append({
+                    "type": "header",
+                    "parameters": [{"type": "image", "image": {"link": imagen_url}}],
+                })
+
+            variables = card.get("variables", [])
+            if variables:
+                components.append({
+                    "type": "body",
+                    "parameters": [{"type": "text", "text": str(v)} for v in variables],
+                })
+
+            for btn_idx, btn in enumerate(card.get("botones", [])[:2]):
+                tipo = btn.get("tipo", "quick_reply")
+                btn_component: Dict[str, Any] = {
+                    "type": "button",
+                    "index": btn_idx,
+                }
+                if tipo == "url":
+                    btn_component["sub_type"] = "url"
+                    btn_component["parameters"] = [{"type": "text", "text": btn.get("url", "")}]
+                else:
+                    btn_component["sub_type"] = "quick_reply"
+                    btn_component["parameters"] = [
+                        {"type": "payload", "payload": btn.get("payload", f"CARD_{idx}_BTN_{btn_idx}")}
+                    ]
+                components.append(btn_component)
+
+            api_cards.append({"card_index": idx, "components": components})
+
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": to,
+            "type": "template",
+            "template": {
+                "name": template_name,
+                "language": {"code": language},
+                "components": [{"type": "carousel", "cards": api_cards}],
+            },
+        }
+        try:
+            resp = requests.post(f"{self.base_url}/messages", headers=self.headers, json=payload)
+            if resp.ok:
+                logger.info("Carrusel enviado a %s (template=%s, cards=%d)", to, template_name, len(api_cards))
+                return True
+            logger.error("Error enviando carrusel a %s: %s %s", to, resp.status_code, resp.text)
+            return False
+        except Exception as e:
+            logger.error("Excepción enviando carrusel a %s: %s", to, e)
+            return False
+
     def _enviar_audio(self, to: str, media_id: str) -> bool:
         """
         Envía un mensaje de audio usando un media_id previamente subido.

@@ -2,6 +2,26 @@
 
 Todas las mejoras y cambios importantes de Behemot Framework se documentan en este archivo.
 
+## [0.6.14] - 2026-06-16
+
+### Feature
+
+**WhatsApp: soporte de carrusel de productos (`enviar_carrusel_template`)**
+
+Nuevo método en `WhatsAppConnector` que envía un carrusel horizontal de
+tarjetas via template aprobado en Meta Business Manager.
+
+Cada tarjeta acepta:
+- `imagen_url`: URL pública de la imagen del header
+- `variables`: lista de strings con las variables del body (en orden)
+- `botones`: hasta 2 botones, tipo `quick_reply` (payload) o `url`
+
+El agente que usa el framework puede exponer un `@tool` que llame a este
+método con los datos de sus productos. El template debe crearse y aprobarse
+previamente en Meta Business Manager (tipo "carousel").
+
+Límite de WhatsApp: máximo 10 cards por mensaje (el método trunca silenciosamente).
+
 ## [0.6.13] - 2026-06-12
 
 ### Bug fix
