@@ -1,6 +1,7 @@
 # app/tooling.py
 from functools import wraps
-from typing import Callable, Dict, Any, List
+from typing import Callable, Dict, Any, List, Optional
+import inspect
 import json
 import asyncio
 import logging
@@ -17,6 +18,29 @@ try:
     _JSONSCHEMA_AVAILABLE = True
 except Exception:  # pragma: no cover
     _JSONSCHEMA_AVAILABLE = False
+
+
+class ToolContext:
+    """
+    Contexto de sesión inyectado como primer argumento (`agente`) en tools que
+    lo declaran explícitamente.
+
+    Atributos disponibles según el canal:
+      - phone_number        : número o ID del usuario que disparó la conversación
+      - whatsapp_connector  : instancia de WhatsAppConnector (solo canal whatsapp)
+    """
+    def __init__(self, **kwargs):
+        for k, v in kwargs.items():
+            setattr(self, k, v)
+
+
+def _handler_wants_agente(handler: Callable) -> bool:
+    """True si el primer parámetro del handler se llama 'agente'."""
+    try:
+        params = list(inspect.signature(handler).parameters.keys())
+        return bool(params) and params[0] == "agente"
+    except (ValueError, TypeError):
+        return False
 
 
 # Variable global para registrar callbacks de herramientas
@@ -91,7 +115,12 @@ def get_tool_definitions() -> List[Dict[str, Any]]:
         for tool_info in TOOL_REGISTRY.values()
     ]
 
-async def call_tool(name: str, arguments: str, auto_response: bool = True) -> str:
+async def call_tool(
+    name: str,
+    arguments: str,
+    auto_response: bool = True,
+    session_context: Optional[dict] = None,
+) -> str:
     """
     Llama a la herramienta registrada de forma asíncrona.
     Si la función es asíncrona, awaita su resultado; de lo contrario, la
@@ -100,6 +129,11 @@ async def call_tool(name: str, arguments: str, auto_response: bool = True) -> st
     Antes de invocar el handler, valida `arguments` contra el JSON Schema
     declarado al registrar la tool. Argumentos inválidos se rechazan sin
     ejecutar la tool — esto evita tool poisoning vía prompt injection.
+
+    Si `session_context` está presente y el handler declara `agente` como
+    primer parámetro, se construye un ToolContext y se inyecta automáticamente:
+        handler(agente, args)   ← con contexto
+        handler(args)           ← sin contexto (comportamiento anterior)
     """
     try:
         args = json.loads(arguments) if arguments else {}
@@ -131,7 +165,11 @@ async def call_tool(name: str, arguments: str, auto_response: bool = True) -> st
         )
 
     handler = tool_info["handler"]
-    result = handler(args)
+    if session_context and _handler_wants_agente(handler):
+        agente = ToolContext(**session_context)
+        result = handler(agente, args)
+    else:
+        result = handler(args)
     if asyncio.iscoroutine(result):
         result = await result
 

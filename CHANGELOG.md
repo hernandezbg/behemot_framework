@@ -2,6 +2,29 @@
 
 Todas las mejoras y cambios importantes de Behemot Framework se documentan en este archivo.
 
+## [0.6.16] - 2026-06-16
+
+### Feature
+
+**Tooling: inyección de contexto de sesión en tools (`agente`)**
+
+Los tools que declaran `agente` como primer parámetro reciben automáticamente
+un `ToolContext` con datos de la sesión activa. El framework detecta la firma
+vía `inspect.signature` — sin cambios en tools existentes.
+
+Atributos disponibles en canal WhatsApp:
+  - `agente.phone_number` → número del usuario
+  - `agente.whatsapp_connector` → instancia de WhatsAppConnector
+
+Cambios internos:
+  - `tooling.py`: agrega `ToolContext`, `_handler_wants_agente()` y parámetro
+    `session_context` en `call_tool()`
+  - `assistant.py`: propaga `session_context` por `generar_respuesta` → `_run_turn`
+    → los tres call sites de `call_tool()`
+  - `factory.py`: construye y pasa `session_context` en el handler WhatsApp
+
+Backwards compatible: tools sin `agente` siguen funcionando igual.
+
 ## [0.6.15] - 2026-06-16
 
 ### Feature

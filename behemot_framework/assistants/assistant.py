@@ -63,7 +63,7 @@ class Assistant:
         else:
             logger.info("🚫 MORPHING deshabilitado")
 
-    async def generar_respuesta(self, chat_id: str, mensaje_usuario: str, imagen_path: str = None) -> str:
+    async def generar_respuesta(self, chat_id: str, mensaje_usuario: str, imagen_path: str = None, session_context: dict = None) -> str:
         """Punto de entrada público. Envuelve _run_turn con tracing de Langfuse."""
         from behemot_framework.services.observability import start_trace, end_trace
         trace = start_trace(
@@ -74,14 +74,14 @@ class Assistant:
         )
         result = None
         try:
-            result = await self._run_turn(chat_id, mensaje_usuario, imagen_path)
+            result = await self._run_turn(chat_id, mensaje_usuario, imagen_path, session_context)
             return result
         except Exception:
             raise
         finally:
             end_trace(trace, result)
 
-    async def _run_turn(self, chat_id: str, mensaje_usuario: str, imagen_path: str = None) -> str:
+    async def _run_turn(self, chat_id: str, mensaje_usuario: str, imagen_path: str = None, session_context: dict = None) -> str:
 
         # Verificar si es un comando especial
         if mensaje_usuario.strip().startswith("&"):
@@ -435,12 +435,12 @@ class Assistant:
                     # Ejecutar la herramienta especificada por el modelo
                     function_name = choice.message.function_call.name
                     function_arguments = choice.message.function_call.arguments if choice.message.function_call.arguments else "{}"
-                    tool_result = await call_tool(function_name, function_arguments)
+                    tool_result = await call_tool(function_name, function_arguments, session_context=session_context)
                 elif default_tool:
                     # Si no hay function_call, usar la herramienta por defecto
-                    function_name = default_tool  
+                    function_name = default_tool
                     function_arguments = json.dumps(default_tool_args)
-                    tool_result = await call_tool(function_name, function_arguments)
+                    tool_result = await call_tool(function_name, function_arguments, session_context=session_context)
                 else:
                     # Si no hay herramientas disponibles, continuar con la conversación normal
                     return answer
@@ -498,7 +498,7 @@ class Assistant:
             
             # Ejecutar la herramienta
             logger.info(f"🚀 Ejecutando herramienta: {function_name} con argumentos: {function_arguments}")
-            tool_result = await call_tool(function_name, function_arguments)
+            tool_result = await call_tool(function_name, function_arguments, session_context=session_context)
             logger.info(f"✅ Resultado de herramienta '{function_name}': {str(tool_result)[:100]}...")
             
             # Agrega el resultado de la función al contexto

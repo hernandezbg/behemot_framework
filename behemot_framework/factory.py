@@ -786,7 +786,13 @@ class BehemotFactory:
                 if texto:
                     # Generar respuesta del asistente
                     logger.info(f"Generando respuesta para {phone_number}")
-                    respuesta = await self.asistente.generar_respuesta(str(phone_number), texto, imagen_path)
+                    respuesta = await self.asistente.generar_respuesta(
+                        str(phone_number), texto, imagen_path,
+                        session_context={
+                            "phone_number": str(phone_number),
+                            "whatsapp_connector": self.whatsapp_connector,
+                        },
+                    )
 
                     # Enviar respuesta
                     logger.info(f"Enviando respuesta a {phone_number}")
