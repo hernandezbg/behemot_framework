@@ -2,6 +2,16 @@
 
 Todas las mejoras y cambios importantes de Behemot Framework se documentan en este archivo.
 
+## [0.6.19] - 2026-06-16
+
+### Bug fix
+
+**WhatsApp: type de card en carrusel interactivo debe ser "button" no "image"**
+
+Meta rechazaba el valor `"image"` con un enum error. La lista de valores
+válidos que devuelve Meta no incluye "image" — para cards con botones
+(quick reply / URL) el valor correcto es `"button"`.
+
 ## [0.6.18] - 2026-06-16
 
 ### Bug fix

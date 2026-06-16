@@ -436,7 +436,7 @@ class WhatsAppConnector:
         for idx, card in enumerate(cards[:10]):
             api_card: Dict[str, Any] = {
                 "card_index": idx,
-                "type": "image",
+                "type": "button",
             }
 
             imagen_url = card.get("imagen_url", "")
