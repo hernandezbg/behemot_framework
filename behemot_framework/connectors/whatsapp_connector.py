@@ -49,15 +49,20 @@ class WhatsAppConnector:
             value = changes.get("value", {})
             
             if "messages" not in value:
+                if value:
+                    logger.warning(
+                        "extraer_mensaje: sin 'messages', keys: %s — value: %s",
+                        list(value.keys()), value,
+                    )
                 return None, None
-                
+
             message = value["messages"][0]
-            
+
             # Obtener el número de teléfono del remitente
             sender = message.get("from")
             if not sender:
                 return None, None
-                
+
             # Determinar tipo de mensaje
             message_type = message.get("type", "unknown")
             
@@ -119,7 +124,11 @@ class WhatsAppConnector:
                         "address": location.get("address", ""),
                     }
 
-            # No procesamos otros tipos por ahora
+            # Tipo no manejado — loguear para diagnóstico
+            logger.warning(
+                "extraer_mensaje: tipo no manejado '%s' — message: %s",
+                message_type, message,
+            )
             return sender, None
             
         except Exception as e:

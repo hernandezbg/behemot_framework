@@ -2,6 +2,18 @@
 
 Todas las mejoras y cambios importantes de Behemot Framework se documentan en este archivo.
 
+## [0.6.24] - 2026-06-17
+
+### Improvement
+
+**WhatsApp: logging completo de diagnóstico en extraer_mensaje**
+
+Dos nuevos WARNING en `extraer_mensaje`:
+  1. Cuando llega un webhook sin `messages` (status updates, etc.) — loguea
+     las keys y el value completo para ver qué envía Meta.
+  2. Catch-all al final para tipos de mensaje no manejados — loguea el type
+     y el message completo.
+
 ## [0.6.23] - 2026-06-17
 
 ### Improvement
