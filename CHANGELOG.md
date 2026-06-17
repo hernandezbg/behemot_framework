@@ -2,6 +2,22 @@
 
 Todas las mejoras y cambios importantes de Behemot Framework se documentan en este archivo.
 
+## [0.6.26] - 2026-06-17
+
+### Bug fix
+
+**Handoff: historial con content=None causaba 400 en la API de behemot.net**
+
+Cuando el LLM hacía un function_call, el mensaje del asistente quedaba con
+`content=None` en Redis. `build_history()` usaba `msg.get("content", "")` que
+devuelve `None` (no `""`) cuando la clave existe con valor None — el default
+solo aplica si la clave está ausente.
+
+Esos None llegaban a la API de la bandeja → 400 "Este campo no puede estar en blanco".
+
+Fix: `content = msg.get("content") or ""` + `if not content: continue`.
+Se descartan mensajes con content vacío/None antes de armar el historial.
+
 ## [0.6.25] - 2026-06-17
 
 ### Feature

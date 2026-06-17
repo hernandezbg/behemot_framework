@@ -250,7 +250,8 @@ def verify_signature(payload_bytes: bytes, signature_header: str, secret: str) -
 def build_history(chat_id: str, max_messages: int = 20) -> list:
     """
     Construye el historial de conversación a enviar en el /start.
-    Toma los últimos `max_messages` mensajes, excluyendo los del sistema.
+    Toma los últimos `max_messages` mensajes, excluyendo los del sistema y
+    los mensajes con content vacío o None (ej: function_calls del asistente).
     """
     try:
         from behemot_framework.context import get_conversation
@@ -258,10 +259,13 @@ def build_history(chat_id: str, max_messages: int = 20) -> list:
         history = []
         for msg in conv:
             role = msg.get("role")
+            content = msg.get("content") or ""
+            if not content:
+                continue
             if role == "user":
-                history.append({"role": "user", "content": msg.get("content", "")})
+                history.append({"role": "user", "content": content})
             elif role == "assistant":
-                history.append({"role": "assistant", "content": msg.get("content", "")})
+                history.append({"role": "assistant", "content": content})
         return history[-max_messages:]
     except Exception as e:
         logger.warning("No se pudo construir historial para handoff: %s", e)

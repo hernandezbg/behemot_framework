@@ -160,7 +160,7 @@ with open("README.md", encoding="utf-8") as f:
 
 setup(
     name="behemot_framework",
-    version="0.6.25",
+    version="0.6.26",
     packages=find_packages(),
     install_requires=CORE_REQUIRES,
     extras_require=EXTRAS,
