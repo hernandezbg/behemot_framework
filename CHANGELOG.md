@@ -2,6 +2,17 @@
 
 Todas las mejoras y cambios importantes de Behemot Framework se documentan en este archivo.
 
+## [0.6.23] - 2026-06-17
+
+### Improvement
+
+**WhatsApp: logging de diagnóstico para subtipos interactive no manejados**
+
+Cuando llega un mensaje `type=interactive` con un subtipo distinto a
+`button_reply`, ahora se loguea un WARNING con el tipo y el payload completo
+en vez de ignorarlo silenciosamente. Facilita el diagnóstico de nuevos
+tipos de interacción del carrusel.
+
 ## [0.6.22] - 2026-06-16
 
 ### Feature

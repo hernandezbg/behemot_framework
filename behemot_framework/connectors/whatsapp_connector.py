@@ -88,11 +88,17 @@ class WhatsAppConnector:
 
             elif message_type == "interactive":
                 interactive = message.get("interactive", {})
-                if interactive.get("type") == "button_reply":
+                interactive_type = interactive.get("type")
+                if interactive_type == "button_reply":
                     btn = interactive.get("button_reply", {})
                     payload = btn.get("id", "")
                     if payload:
                         return sender, {"type": "text", "content": payload}
+                else:
+                    logger.warning(
+                        "interactive subtipo no manejado: %s — payload: %s",
+                        interactive_type, interactive,
+                    )
 
             elif message_type == "location":
                 location = message.get("location", {})
