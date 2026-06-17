@@ -91,6 +91,11 @@ class WhatsAppConnector:
                             "caption": caption
                         }
 
+            elif message_type == "button":
+                payload = message.get("button", {}).get("payload", "")
+                if payload:
+                    return sender, {"type": "text", "content": payload}
+
             elif message_type == "interactive":
                 interactive = message.get("interactive", {})
                 interactive_type = interactive.get("type")

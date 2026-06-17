@@ -2,6 +2,19 @@
 
 Todas las mejoras y cambios importantes de Behemot Framework se documentan en este archivo.
 
+## [0.6.25] - 2026-06-17
+
+### Feature
+
+**WhatsApp: manejo de type "button" — respuestas de botones de carrusel**
+
+Cuando el usuario toca un botón quick_reply de un carrusel, Meta envía
+`type: "button"` (no `interactive/button_reply` como se esperaba).
+El payload exacto es `message["button"]["payload"]`.
+
+`extraer_mensaje()` ahora maneja este tipo y pasa el payload al asistente
+como texto, completando el flujo carrusel → tap → asistente.
+
 ## [0.6.24] - 2026-06-17
 
 ### Improvement
