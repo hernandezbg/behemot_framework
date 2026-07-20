@@ -2,6 +2,25 @@
 
 Todas las mejoras y cambios importantes de Behemot Framework se documentan en este archivo.
 
+## [0.6.27] - 2026-07-20
+
+### Feature
+
+**ElevenLabs: voice_settings y language_code configurables por variables de entorno**
+
+`TTSService` ahora acepta cinco parámetros opcionales para ElevenLabs que antes
+no eran configurables, lo que producía que la API aplicara sus propios defaults
+en lugar de los valores ajustados en el Playground:
+
+- `ELEVENLABS_STABILITY` — float 0.0–1.0 (0 = "Creative", 1 = "Stable")
+- `ELEVENLABS_SIMILARITY_BOOST` — float 0.0–1.0
+- `ELEVENLABS_STYLE` — float 0.0–1.0
+- `ELEVENLABS_SPEAKER_BOOST` — `"true"` / `"false"` (Speaker Boost)
+- `ELEVENLABS_LANGUAGE_CODE` — ej. `"es"` para forzar idioma
+
+Si ninguno de estos valores está definido, la API de ElevenLabs aplica sus
+defaults exactamente igual que antes — sin romper proyectos existentes.
+
 ## [0.6.26] - 2026-06-17
 
 ### Bug fix

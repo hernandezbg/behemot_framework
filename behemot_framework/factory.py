@@ -68,6 +68,11 @@ class BehemotFactory:
                 elevenlabs_api_key=config.get("ELEVENLABS_API_KEY"),
                 elevenlabs_voice_id=config.get("ELEVENLABS_VOICE_ID", "Rachel"),
                 elevenlabs_model=config.get("ELEVENLABS_MODEL", "eleven_multilingual_v2"),
+                elevenlabs_stability=float(config["ELEVENLABS_STABILITY"]) if config.get("ELEVENLABS_STABILITY") is not None else None,
+                elevenlabs_similarity_boost=float(config["ELEVENLABS_SIMILARITY_BOOST"]) if config.get("ELEVENLABS_SIMILARITY_BOOST") is not None else None,
+                elevenlabs_style=float(config["ELEVENLABS_STYLE"]) if config.get("ELEVENLABS_STYLE") is not None else None,
+                elevenlabs_speaker_boost=config.get("ELEVENLABS_SPEAKER_BOOST", "").lower() in ("true", "1", "yes") if config.get("ELEVENLABS_SPEAKER_BOOST") is not None else None,
+                elevenlabs_language_code=config.get("ELEVENLABS_LANGUAGE_CODE") or None,
             )
         else:
             self.transcriptor = None

@@ -31,6 +31,12 @@ class TTSService:
         elevenlabs_api_key: Optional[str] = None,
         elevenlabs_voice_id: str = "Rachel",
         elevenlabs_model: str = "eleven_multilingual_v2",
+        # ElevenLabs voice_settings (None = usar defaults de la API)
+        elevenlabs_stability: Optional[float] = None,
+        elevenlabs_similarity_boost: Optional[float] = None,
+        elevenlabs_style: Optional[float] = None,
+        elevenlabs_speaker_boost: Optional[bool] = None,
+        elevenlabs_language_code: Optional[str] = None,
     ):
         self.provider = provider.lower()
         self._client = None
@@ -42,6 +48,11 @@ class TTSService:
                     self._client = ElevenLabs(api_key=elevenlabs_api_key)
                     self._el_voice_id = elevenlabs_voice_id
                     self._el_model = elevenlabs_model
+                    self._el_stability = elevenlabs_stability
+                    self._el_similarity_boost = elevenlabs_similarity_boost
+                    self._el_style = elevenlabs_style
+                    self._el_speaker_boost = elevenlabs_speaker_boost
+                    self._el_language_code = elevenlabs_language_code
                     logger.info("TTSService: provider ElevenLabs inicializado.")
                 except ImportError:
                     logger.error(
@@ -78,12 +89,26 @@ class TTSService:
 
         try:
             if self.provider == "elevenlabs":
-                audio_iter = self._client.text_to_speech.convert(
-                    voice_id=self._el_voice_id,
-                    text=text,
-                    model_id=self._el_model,
-                    output_format="mp3_44100_128",
-                )
+                el_kwargs = {
+                    "voice_id": self._el_voice_id,
+                    "text": text,
+                    "model_id": self._el_model,
+                    "output_format": "mp3_44100_128",
+                }
+                voice_settings = {}
+                if self._el_stability is not None:
+                    voice_settings["stability"] = self._el_stability
+                if self._el_similarity_boost is not None:
+                    voice_settings["similarity_boost"] = self._el_similarity_boost
+                if self._el_style is not None:
+                    voice_settings["style"] = self._el_style
+                if self._el_speaker_boost is not None:
+                    voice_settings["use_speaker_boost"] = self._el_speaker_boost
+                if voice_settings:
+                    el_kwargs["voice_settings"] = voice_settings
+                if self._el_language_code:
+                    el_kwargs["language_code"] = self._el_language_code
+                audio_iter = self._client.text_to_speech.convert(**el_kwargs)
                 with open(temp_path, "wb") as f:
                     for chunk in audio_iter:
                         f.write(chunk)
