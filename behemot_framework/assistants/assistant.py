@@ -409,8 +409,15 @@ class Assistant:
                 else:
                     # Si no hay herramientas disponibles, continuar con la conversación normal
                     return answer
-                
-                # Agrega el resultado de la función al contexto
+
+                # El turno del assistant con el function_call debe preceder al role:function.
+                # Sin este mensaje la secuencia es inválida para la API de OpenAI y el modelo
+                # puede devolver el nombre de la función como texto literal en vez de redactar.
+                conversation.append({
+                    "role": "assistant",
+                    "content": None,
+                    "function_call": {"name": function_name, "arguments": function_arguments},
+                })
                 conversation.append({
                     "role": "function",
                     "name": function_name,
@@ -465,8 +472,15 @@ class Assistant:
             logger.info(f"🚀 Ejecutando herramienta: {function_name} con argumentos: {function_arguments}")
             tool_result = await call_tool(function_name, function_arguments, session_context=session_context)
             logger.info(f"✅ Resultado de herramienta '{function_name}': {str(tool_result)[:100]}...")
-            
-            # Agrega el resultado de la función al contexto
+
+            # El turno del assistant con el function_call debe preceder al role:function.
+            # Sin este mensaje la secuencia es inválida para la API de OpenAI y el modelo
+            # puede devolver el nombre de la función como texto literal en vez de redactar.
+            conversation.append({
+                "role": "assistant",
+                "content": None,
+                "function_call": {"name": function_name, "arguments": function_arguments},
+            })
             conversation.append({
                 "role": "function",
                 "name": function_name,

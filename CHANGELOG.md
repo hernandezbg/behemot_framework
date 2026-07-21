@@ -2,6 +2,27 @@
 
 Todas las mejoras y cambios importantes de Behemot Framework se documentan en este archivo.
 
+## [0.6.29] - 2026-07-21
+
+### Bug fix
+
+**Function calling: faltaba el mensaje assistant/function_call antes del role "function"**
+
+La API de OpenAI requiere que el historial incluya el turno del assistant con
+`function_call: {name, arguments}` inmediatamente antes del mensaje `role: "function"`
+con el resultado de la herramienta. Sin ese mensaje la secuencia es inválida y el
+modelo puede devolver el nombre de la función como texto literal en lugar de redactar
+la respuesta final.
+
+El bug se manifestaba con mensajes de bajo contenido ("Hola", "?") con gpt-4o-mini:
+el usuario recibía literalmente `consultar_producto("Hola")` en vez de la respuesta.
+Con mensajes más ricos no se reproducía porque el modelo tiene señal suficiente para
+completar el turno a pesar del historial malformado.
+
+Fix aplicado en los dos lugares del patrón en `_run_turn` (rama "buscaré..." automático
+y rama principal de function_call): se agrega el mensaje del assistant antes del
+`role: "function"` en ambos casos.
+
 ## [0.6.28] - 2026-07-21
 
 ### Bug fix
