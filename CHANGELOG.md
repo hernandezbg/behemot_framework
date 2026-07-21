@@ -2,6 +2,23 @@
 
 Todas las mejoras y cambios importantes de Behemot Framework se documentan en este archivo.
 
+## [0.6.28] - 2026-07-21
+
+### Bug fix
+
+**Imagen + herramientas: el flujo de visión ignoraba las tools del agente**
+
+Cuando llegaba un mensaje con imagen y el modelo soportaba visión, el asistente
+usaba un flujo directo (`generar_respuesta` sin functions) que retornaba sin
+pasar por `generar_respuesta_con_functions`. Como consecuencia, los `@tool`
+del bot (buscar_producto, armar_presupuesto, etc.) nunca se ejecutaban ante
+mensajes con imagen.
+
+Fix: el mensaje multimodal (texto + imagen en base64) ahora se inserta en el
+historial de conversación antes de llamar a `generar_respuesta_con_functions`,
+unificando ambos flujos. El modelo puede ver la imagen y llamar tools en el
+mismo turno. Aplica a WhatsApp, Telegram y cualquier canal que envíe imágenes.
+
 ## [0.6.27] - 2026-07-20
 
 ### Feature

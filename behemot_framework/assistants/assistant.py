@@ -107,20 +107,23 @@ class Assistant:
 
         # Manejar imágenes - Almacenar la ruta de la imagen para usarla más adelante
         self._current_image_path = imagen_path if imagen_path else None
-        
-        # Preparar el mensaje del usuario
-        user_message_content = mensaje_usuario
-        if imagen_path:
-            if hasattr(self.modelo, 'soporta_vision') and self.modelo.soporta_vision():
-                # Si el modelo soporta visión, agregar contexto sobre la imagen
-                user_message_content = f"{mensaje_usuario}\n[Imagen adjunta para análisis]"
-                logger.info(f"🖼️ Procesando mensaje con imagen: {imagen_path}")
+
+        # Preparar el mensaje del usuario e insertarlo en el historial.
+        # Si hay imagen y el modelo soporta visión, se arma un mensaje multimodal
+        # (texto + imagen en base64) para que el modelo pueda ver la imagen Y seguir
+        # teniendo acceso a las herramientas en el mismo turno.
+        if imagen_path and hasattr(self.modelo, 'soporta_vision') and self.modelo.soporta_vision():
+            logger.info(f"🖼️ Procesando mensaje con imagen (flujo multimodal+tools): {imagen_path}")
+            if hasattr(self.modelo, '_create_image_message'):
+                conversation.append(self.modelo._create_image_message(mensaje_usuario, imagen_path))
             else:
-                # Si el modelo no soporta visión, informar al usuario
-                user_message_content = f"{mensaje_usuario}\n\n[Nota: Recibí una imagen pero este modelo no puede procesarla. Solo puedo responder al texto.]"
-                logger.warning(f"⚠️ Modelo {type(self.modelo).__name__} no soporta visión. Imagen ignorada: {imagen_path}")
-        
-        conversation.append({"role": "user", "content": user_message_content})
+                conversation.append({"role": "user", "content": mensaje_usuario})
+        elif imagen_path:
+            user_message_content = f"{mensaje_usuario}\n\n[Nota: Recibí una imagen pero este modelo no puede procesarla. Solo puedo responder al texto.]"
+            logger.warning(f"⚠️ Modelo {type(self.modelo).__name__} no soporta visión. Imagen ignorada: {imagen_path}")
+            conversation.append({"role": "user", "content": user_message_content})
+        else:
+            conversation.append({"role": "user", "content": mensaje_usuario})
         
         # MORPHING: Verificar si necesito cambiar de personalidad/configuración
         morph_result = self.morphing_manager.process_message(mensaje_usuario, conversation)
@@ -306,75 +309,37 @@ class Assistant:
         # Debug: Mostrar herramientas disponibles
         logger.info(f"🔧 Herramientas disponibles para el assistant: {[f['name'] for f in functions]}")
 
-        # Debug: Verificar condiciones para procesamiento de imagen
-        has_image = self._current_image_path is not None
-        has_vision_method = hasattr(self.modelo, 'soporta_vision')
-        supports_vision = has_vision_method and self.modelo.soporta_vision() if has_vision_method else False
-        
-        logger.info(f"🔍 Debug procesamiento imagen: has_image={has_image}, has_vision_method={has_vision_method}, supports_vision={supports_vision}")
-        if has_image:
-            logger.info(f"📷 Ruta imagen: {self._current_image_path}")
-            logger.info(f"🤖 Tipo de modelo: {type(self.modelo).__name__}")
+        # Llamar siempre con herramientas. Si hay imagen, ya está incluida como mensaje
+        # multimodal en el historial (ver bloque anterior), por lo que el modelo puede
+        # ver la imagen Y llamar tools en el mismo turno.
+        try:
+            response = self.modelo.generar_respuesta_con_functions(conversation, functions)
+        except Exception as e:
+            return f"Error al generar respuesta: {str(e)}"
 
-        # Decidir qué método usar basado en si hay imagen y si el modelo soporta visión
-        if (self._current_image_path and 
-            hasattr(self.modelo, 'soporta_vision') and 
-            self.modelo.soporta_vision()):  # Si hay imagen y el modelo soporta visión, usar método directo
-            
-            logger.info(f"🖼️ USANDO FLUJO DIRECTO PARA IMAGEN: {self._current_image_path}")
+        # Observability: registrar la llamada LLM con tokens si están disponibles
+        from behemot_framework.services.observability import get_current_trace, record_generation
+        _obs_trace = get_current_trace()
+        if _obs_trace:
+            _first_content = ""
             try:
-                # Para mensajes con imagen sin herramientas, usar el método directo
-                response_text = self.modelo.generar_respuesta(
-                    mensaje_usuario, 
-                    self.prompt_sistema, 
-                    self._current_image_path
-                )
-                
-                # Aplicar filtro si está disponible
-                if self.safety_filter:
-                    safety_result = await self.safety_filter.filter_content(response_text)
-                    if not safety_result["is_safe"]:
-                        logger.warning(f"Respuesta filtrada - Chat {chat_id}: {safety_result['reason']}")
-                        response_text = safety_result["filtered_content"]
-                
-                # Agregar a la conversación y guardar
-                conversation.append({"role": "assistant", "content": response_text})
-                save_conversation(chat_id, conversation)
-                
-                return response_text
-                
-            except Exception as e:
-                return f"Error al generar respuesta con imagen: {str(e)}"
-        else:
-            # Usar el método con herramientas (comportamiento actual)
-            try:
-                response = self.modelo.generar_respuesta_con_functions(conversation, functions)
-            except Exception as e:
-                return f"Error al generar respuesta: {str(e)}"
-
-            # Observability: registrar la llamada LLM con tokens si están disponibles
-            from behemot_framework.services.observability import get_current_trace, record_generation
-            _obs_trace = get_current_trace()
-            if _obs_trace:
-                _first_content = ""
-                try:
-                    _first_content = response.choices[0].message.content or ""
-                except Exception:
-                    pass
-                _usage = None
-                if hasattr(response, "usage") and response.usage:
-                    _usage = {
-                        "input": response.usage.prompt_tokens,
-                        "output": response.usage.completion_tokens,
-                    }
-                record_generation(
-                    _obs_trace,
-                    name="llm-call",
-                    model=getattr(self.modelo, "model_name", "unknown"),
-                    input_messages=conversation,
-                    output=_first_content,
-                    usage=_usage,
-                )
+                _first_content = response.choices[0].message.content or ""
+            except Exception:
+                pass
+            _usage = None
+            if hasattr(response, "usage") and response.usage:
+                _usage = {
+                    "input": response.usage.prompt_tokens,
+                    "output": response.usage.completion_tokens,
+                }
+            record_generation(
+                _obs_trace,
+                name="llm-call",
+                model=getattr(self.modelo, "model_name", "unknown"),
+                input_messages=conversation,
+                output=_first_content,
+                usage=_usage,
+            )
 
         choice = response.choices[0]
         
