@@ -4,6 +4,7 @@ import os
 import tempfile
 import uuid
 import logging
+from behemot_framework.services.tts_service import TTS_AUDIO_MIMETYPE
 
 logger = logging.getLogger(__name__)
 
@@ -146,7 +147,7 @@ class TelegramConnector:
                 response = requests.post(
                     endpoint,
                     data={"chat_id": chat_id},
-                    files={"voice": (os.path.basename(audio_path), f, "audio/mpeg")},
+                    files={"voice": (os.path.basename(audio_path), f, TTS_AUDIO_MIMETYPE)},
                 )
             if response.ok:
                 logger.info(f"Nota de voz enviada a chat_id {chat_id}")

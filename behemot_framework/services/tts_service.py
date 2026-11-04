@@ -7,6 +7,10 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+# Formato único de salida de synthesize(). WhatsApp solo renderiza nota de voz nativa
+# con OGG/Opus, y Telegram también lo acepta en sendVoice.
+TTS_AUDIO_MIMETYPE = "audio/ogg; codecs=opus"
+
 
 class TTSService:
     """
@@ -78,14 +82,14 @@ class TTSService:
 
     def synthesize(self, text: str) -> Optional[str]:
         """
-        Sintetiza texto a audio MP3 y devuelve la ruta del archivo temporal.
+        Sintetiza texto a audio OGG/Opus y devuelve la ruta del archivo temporal.
         Devuelve None si ocurre cualquier error.
         """
         if self._client is None:
             logger.error(f"TTS no disponible: provider '{self.provider}' sin credenciales.")
             return None
 
-        temp_path = os.path.join(tempfile.gettempdir(), f"tts_{uuid.uuid4().hex}.mp3")
+        temp_path = os.path.join(tempfile.gettempdir(), f"tts_{uuid.uuid4().hex}.ogg")
 
         try:
             if self.provider == "elevenlabs":
@@ -93,7 +97,7 @@ class TTSService:
                     "voice_id": self._el_voice_id,
                     "text": text,
                     "model_id": self._el_model,
-                    "output_format": "mp3_44100_128",
+                    "output_format": "opus_48000_64",
                 }
                 voice_settings = {}
                 if self._el_stability is not None:
@@ -118,6 +122,7 @@ class TTSService:
                     model=self.model,
                     voice=self.voice,
                     input=text,
+                    response_format="opus",
                 )
                 response.stream_to_file(temp_path)
 

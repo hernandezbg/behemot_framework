@@ -2,6 +2,22 @@
 
 Todas las mejoras y cambios importantes de Behemot Framework se documentan en este archivo.
 
+## [0.6.30] - 2026-11-04
+
+### Bug fix
+
+**TTS: las respuestas de voz en WhatsApp llegaban como archivo adjunto, no como nota de voz**
+
+El pipeline generaba siempre MP3 y lo subía como `audio/mpeg`, y el envío no marcaba el
+mensaje como nota de voz. WhatsApp solo renderiza nota de voz nativa (burbuja con forma
+de onda y play inline) con OGG/Opus y el flag `voice: true`.
+
+- `TTSService.synthesize()` ahora genera siempre OGG/Opus, con OpenAI y con ElevenLabs.
+- WhatsApp sube el audio como `audio/ogg; codecs=opus` y lo envía con `voice: true`.
+- Telegram declara el mismo mimetype en `sendVoice`, porque comparte `synthesize()`.
+
+Los audios de asesores humanos en handoff (`enviar_audio_por_url`) no cambian.
+
 ## [0.6.29] - 2026-07-21
 
 ### Bug fix

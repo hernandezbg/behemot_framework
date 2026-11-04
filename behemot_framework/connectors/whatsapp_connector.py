@@ -8,6 +8,7 @@ import json
 import asyncio
 import uuid
 from typing import Optional, Dict, Any, Tuple
+from behemot_framework.services.tts_service import TTS_AUDIO_MIMETYPE
 
 logger = logging.getLogger(__name__)
 
@@ -284,7 +285,7 @@ class WhatsAppConnector:
             url = f"https://graph.facebook.com/v17.0/{self.phone_number_id}/media"
             headers = {"Authorization": f"Bearer {self.token}"}
             with open(audio_path, "rb") as f:
-                files = {"file": (os.path.basename(audio_path), f, "audio/mpeg")}
+                files = {"file": (os.path.basename(audio_path), f, TTS_AUDIO_MIMETYPE)}
                 data = {"messaging_product": "whatsapp", "type": "audio"}
                 response = requests.post(url, headers=headers, files=files, data=data)
             if response.ok:
@@ -525,7 +526,7 @@ class WhatsAppConnector:
             "recipient_type": "individual",
             "to": to,
             "type": "audio",
-            "audio": {"id": media_id},
+            "audio": {"id": media_id, "voice": True},
         }
         try:
             response = requests.post(endpoint, headers=self.headers, json=payload)
