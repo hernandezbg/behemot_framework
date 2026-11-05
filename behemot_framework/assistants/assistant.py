@@ -95,7 +95,7 @@ class Assistant:
             
             if not safety_result["is_safe"]:
                 logger.warning(f"Mensaje de usuario filtrado - Chat {chat_id}: {safety_result['reason']}")
-                mensaje_usuario = safety_result["filtered_content"]
+                return safety_result["filtered_content"]
 
         # Recupera el historial de la conversación
         conversation = get_conversation(chat_id)

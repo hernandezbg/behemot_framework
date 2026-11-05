@@ -2,6 +2,37 @@
 
 Todas las mejoras y cambios importantes de Behemot Framework se documentan en este archivo.
 
+## [0.7.0] - 2026-11-05
+
+### Control de abuso por usuario (activado por defecto)
+
+Nuevo `AbuseGuard`, que corta los mensajes antes de transcribir o llamar al modelo en
+WhatsApp, Telegram, Google Chat y `/api/chat`. **Cambia el comportamiento sin tocar el
+agente:** para apagarlo, usar `ABUSE_GUARD_ENABLED=false`.
+
+| Regla | Valor por defecto | Variable |
+|---|---|---|
+| Mensajes por minuto por usuario | 30 | `ABUSE_RATE_LIMIT_PER_MINUTE` |
+| Repeticiones exactas consecutivas permitidas | 3 en 60 segundos | `ABUSE_REPEAT_MAX`, `ABUSE_REPEAT_WINDOW_SECONDS` |
+| Infracciones hasta el bloqueo temporal | 3 en una hora | `ABUSE_MAX_STRIKES`, `ABUSE_STRIKE_WINDOW_SECONDS` |
+| Duración del bloqueo temporal | 5 minutos | `ABUSE_BLOCK_SECONDS` |
+| Lista negra manual | Vacía | `ABUSE_BLACKLIST` |
+| Insultos | Desactivado | `ABUSE_INSULT_WORDS` |
+
+- El usuario recibe un solo aviso por incidente (`ABUSE_BLOCK_MESSAGE`); después se ignora
+  en silencio. A la lista negra nunca se le avisa.
+- `/api/chat` responde siempre HTTP 429, porque el cliente espera una respuesta.
+- Durante una conversación con un asesor humano solo se aplica la lista negra.
+- Las notas de voz cuentan para el límite y el bloqueo, pero no para repeticiones ni insultos.
+- Usa Redis si está disponible y, si no, contadores en memoria por proceso.
+
+### Cambio de comportamiento
+
+**`SAFETY_LEVEL`: un mensaje inseguro ya no llega al modelo.** Antes se reemplazaba por un
+texto fijo y se enviaba igual al modelo, pagando el filtro y la respuesta. Ahora se responde
+directamente con ese texto y no se guarda en el historial. También aplica cuando el filtro
+falla (fail-closed).
+
 ## [0.6.30] - 2026-11-04
 
 ### Bug fix

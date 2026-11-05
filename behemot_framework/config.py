@@ -183,6 +183,17 @@ class Config:
 
             # Rate limiting de /api/chat (in-memory, por IP). 0 desactiva el límite.
             "API_RATE_LIMIT_PER_MINUTE": int(os.getenv("API_RATE_LIMIT_PER_MINUTE", "60")),
+            # Control de abuso por usuario en todos los canales. 0 desactiva cada regla.
+            "ABUSE_GUARD_ENABLED": os.getenv("ABUSE_GUARD_ENABLED", "true"),
+            "ABUSE_RATE_LIMIT_PER_MINUTE": os.getenv("ABUSE_RATE_LIMIT_PER_MINUTE", "30"),
+            "ABUSE_REPEAT_MAX": os.getenv("ABUSE_REPEAT_MAX", "3"),
+            "ABUSE_REPEAT_WINDOW_SECONDS": os.getenv("ABUSE_REPEAT_WINDOW_SECONDS", "60"),
+            "ABUSE_MAX_STRIKES": os.getenv("ABUSE_MAX_STRIKES", "3"),
+            "ABUSE_STRIKE_WINDOW_SECONDS": os.getenv("ABUSE_STRIKE_WINDOW_SECONDS", "3600"),
+            "ABUSE_BLOCK_SECONDS": os.getenv("ABUSE_BLOCK_SECONDS", "300"),
+            "ABUSE_BLOCK_MESSAGE": os.getenv("ABUSE_BLOCK_MESSAGE", ""),
+            "ABUSE_BLACKLIST": os.getenv("ABUSE_BLACKLIST", ""),
+            "ABUSE_INSULT_WORDS": os.getenv("ABUSE_INSULT_WORDS", ""),
             # Tope de tamaño de body para JSON y audios (bytes).
             "API_MAX_REQUEST_SIZE": int(os.getenv("API_MAX_REQUEST_SIZE", str(10 * 1024 * 1024))),
             "API_MAX_AUDIO_SIZE": int(os.getenv("API_MAX_AUDIO_SIZE", str(25 * 1024 * 1024))),

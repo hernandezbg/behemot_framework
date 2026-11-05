@@ -20,6 +20,7 @@ from behemot_framework.connectors.telegram_connector import TelegramConnector
 from behemot_framework.connectors.api_connector import ApiConnector
 from behemot_framework.services.transcription_service import TranscriptionService
 from behemot_framework.services.tts_service import TTSService
+from behemot_framework.security.abuse_guard import AbuseGuard, GuardDecision
 
 # Opcional para tipos futuros
 try:
@@ -43,8 +44,9 @@ class BehemotFactory:
         """
         self.config = config
 
-        
-        
+        from behemot_framework.context import redis_client
+        self.abuse_guard = AbuseGuard.from_config(config, redis_client)
+
         # Inicializar componentes básicos
         # Usar ModelFactory para crear el modelo basado en la configuración
         self.modelo = ModelFactory.create_model()
@@ -126,6 +128,37 @@ class BehemotFactory:
         
         logger.info(f"Herramientas cargadas: {', '.join(self.loaded_tools)}")
     
+    def _check_abuse(self, channel: str, user_id: Any, mensaje: Optional[dict] = None, text: Optional[str] = None) -> GuardDecision:
+        """
+        Aplica el control de abuso antes de transcribir o llamar al modelo.
+        Si el mensaje se bloquea, elimina el archivo temporal que haya descargado el conector.
+        """
+        if mensaje is not None:
+            if mensaje["type"] == "text":
+                text = mensaje["content"]
+            elif mensaje["type"] == "image":
+                text = mensaje.get("caption")
+
+        # Los mensajes hacia un asesor humano no consumen tokens y no deben perderse.
+        exempt = False
+        try:
+            from behemot_framework.services.handoff_service import is_enabled, is_in_handoff
+            exempt = is_enabled() and is_in_handoff(str(user_id))
+        except Exception as e:
+            logger.warning("No se pudo verificar handoff para el control de abuso: %s", e)
+
+        decision = self.abuse_guard.check(channel, user_id, text, exempt=exempt)
+
+        if not decision.allowed and mensaje is not None and mensaje["type"] in ("voice", "image"):
+            path = mensaje.get("content")
+            if path and os.path.isfile(path):
+                try:
+                    os.remove(path)
+                except OSError as e:
+                    logger.warning("No se pudo eliminar archivo temporal: %s", e)
+
+        return decision
+
     def setup_telegram_connector(self, fastapi_app: FastAPI) -> None:
         """
         Configura el conector de Telegram y sus endpoints.
@@ -189,7 +222,13 @@ class BehemotFactory:
             
             if mensaje is None:
                 return {"status": "ok"}
-            
+
+            decision = self._check_abuse("telegram", chat_id, mensaje)
+            if not decision.allowed:
+                if decision.notice:
+                    await asyncio.to_thread(self.telegram_connector.enviar_mensaje, chat_id, decision.notice)
+                return {"status": "ok"}
+
             # Registrar usuario en el tracker
             try:
                 from behemot_framework.users import get_user_tracker
@@ -348,6 +387,8 @@ class BehemotFactory:
                     return
             raise HTTPException(status_code=401, detail="Invalid API key")
 
+        from fastapi.responses import JSONResponse
+
         @fastapi_app.post("/api/chat")
         async def process_api_message(request: Request):
             """Endpoint para recibir mensajes de texto o audio de cualquier cliente via API."""
@@ -384,7 +425,11 @@ class BehemotFactory:
                     
                     if not session_id or not audio_file:
                         return {"error": "Formato de mensaje inválido. Se requiere session_id y audio_file", "status": "error"}
-                    
+
+                    decision = self._check_abuse("api", session_id)
+                    if not decision.allowed:
+                        return JSONResponse(status_code=429, content={"error": self.abuse_guard.block_message, "status": "error"})
+
                     # Guardar el archivo temporalmente. Limitamos el tamaño
                     # efectivo aunque el Content-Length declarado sea menor al cap
                     # (defensa contra clientes que mienten en el header).
@@ -427,7 +472,11 @@ class BehemotFactory:
                     
                     if not session_id or not texto:
                         return {"error": "Formato de mensaje inválido", "status": "error"}
-                
+
+                    decision = self._check_abuse("api", session_id, text=texto)
+                    if not decision.allowed:
+                        return JSONResponse(status_code=429, content={"error": self.abuse_guard.block_message, "status": "error"})
+
                 # Registrar usuario en el tracker
                 try:
                     from behemot_framework.users import get_user_tracker
@@ -626,7 +675,13 @@ class BehemotFactory:
                 if mensaje is None or phone_number is None:
                     logger.debug("No se pudo extraer número de teléfono o mensaje")
                     return {"status": "ok"}
-                
+
+                decision = self._check_abuse("whatsapp", phone_number, mensaje)
+                if not decision.allowed:
+                    if decision.notice:
+                        await asyncio.to_thread(self.whatsapp_connector.enviar_mensaje, phone_number, decision.notice)
+                    return {"status": "ok"}
+
                 # Registrar usuario en el tracker
                 try:
                     from behemot_framework.users import get_user_tracker
@@ -913,6 +968,11 @@ class BehemotFactory:
                     # Manejar diferentes tipos de mensaje
                     if mensaje["type"] == "text":
                         texto = mensaje["content"]
+
+                        decision = self._check_abuse("google_chat", chat_id, mensaje)
+                        if not decision.allowed:
+                            return {"text": decision.notice} if decision.notice else {}
+
                         # Generar respuesta
                         respuesta = await self.asistente.generar_respuesta(str(chat_id), texto)
                         

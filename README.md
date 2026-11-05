@@ -203,6 +203,25 @@ SAFETY_LEVEL: "medium"  # off, low, medium, high
 
 **Nota**: El filtro permite automáticamente conversaciones normales como preguntas sobre nombres, edad, fechas, etc.
 
+### Control de Abuso
+
+Activado por defecto en WhatsApp, Telegram, Google Chat y `/api/chat`. Corta los mensajes antes de transcribir o llamar al modelo, así que no consumen tokens. Cada valor se ajusta por variable de entorno o en el YAML, y `0` desactiva esa regla:
+
+```yaml
+ABUSE_GUARD_ENABLED: true          # false apaga todo
+ABUSE_RATE_LIMIT_PER_MINUTE: 30    # mensajes por usuario
+ABUSE_REPEAT_MAX: 3                # repeticiones exactas consecutivas permitidas
+ABUSE_REPEAT_WINDOW_SECONDS: 60
+ABUSE_MAX_STRIKES: 3               # infracciones hasta el bloqueo temporal
+ABUSE_STRIKE_WINDOW_SECONDS: 3600
+ABUSE_BLOCK_SECONDS: 300           # duración del bloqueo
+ABUSE_BLOCK_MESSAGE: "Recibimos muchos mensajes seguidos. Esperá unos minutos y volvé a escribirnos."
+ABUSE_BLACKLIST: []                # IDs o números bloqueados, sin aviso
+ABUSE_INSULT_WORDS: []             # vacío = filtro de insultos desactivado
+```
+
+El usuario recibe un solo aviso por incidente y después se lo ignora en silencio. Cada bloqueo queda en los logs con el prefijo `AbuseGuard`.
+
 ### Configurar Sistema de Permisos
 
 El framework incluye un sistema de permisos granular para comandos administrativos. **Por defecto ningún usuario es admin** — debes declarar explícitamente quién puede ejecutar comandos privilegiados.
