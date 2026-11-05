@@ -428,7 +428,7 @@ class BehemotFactory:
 
                     decision = self._check_abuse("api", session_id)
                     if not decision.allowed:
-                        return JSONResponse(status_code=429, content={"error": self.abuse_guard.block_message, "status": "error"})
+                        return JSONResponse(status_code=429, content={"error": decision.message, "status": "error"})
 
                     # Guardar el archivo temporalmente. Limitamos el tamaño
                     # efectivo aunque el Content-Length declarado sea menor al cap
@@ -475,7 +475,7 @@ class BehemotFactory:
 
                     decision = self._check_abuse("api", session_id, text=texto)
                     if not decision.allowed:
-                        return JSONResponse(status_code=429, content={"error": self.abuse_guard.block_message, "status": "error"})
+                        return JSONResponse(status_code=429, content={"error": decision.message, "status": "error"})
 
                 # Registrar usuario en el tracker
                 try:

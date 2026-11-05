@@ -2,7 +2,7 @@
 import json
 import logging
 import re
-from behemot_framework.context import get_conversation, save_conversation
+from behemot_framework.context import get_conversation, save_conversation, trim_conversation
 from behemot_framework.tooling import get_tool_definitions, call_tool
 from behemot_framework.security.langchain_safety import LangChainSafetyFilter
 from behemot_framework.config import Config
@@ -124,7 +124,16 @@ class Assistant:
             conversation.append({"role": "user", "content": user_message_content})
         else:
             conversation.append({"role": "user", "content": mensaje_usuario})
-        
+
+        # Limita lo que se envía al modelo y lo que se guarda: sin esto cada mensaje
+        # cuesta más que el anterior, porque el historial completo viaja en cada turno.
+        try:
+            max_history = int(Config.get("MAX_HISTORY_MESSAGES", 20) or 0)
+        except (TypeError, ValueError):
+            logger.warning("MAX_HISTORY_MESSAGES inválido; se usa 20")
+            max_history = 20
+        conversation = trim_conversation(conversation, max_history)
+
         # MORPHING: Verificar si necesito cambiar de personalidad/configuración
         morph_result = self.morphing_manager.process_message(mensaje_usuario, conversation)
         current_morph_config = morph_result['morph_config']

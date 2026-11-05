@@ -68,6 +68,32 @@ def get_conversation(chat_id: str):
         logger.error(f"❌ Error recuperando conversación para {chat_id}: {e}")
         return []
 
+def trim_conversation(conversation: list, max_messages: int) -> list:
+    """
+    Conserva el prompt de sistema inicial y los últimos `max_messages` mensajes.
+
+    El recorte siempre arranca en un mensaje de usuario: empezar en medio de un turno
+    dejaría un resultado de herramienta sin su llamada, y la API del modelo lo rechaza.
+    Con `max_messages` 0 o menor no recorta.
+    """
+    has_system = bool(conversation) and conversation[0].get("role") == "system"
+    head = conversation[:1] if has_system else []
+    body = conversation[1:] if has_system else conversation
+
+    if max_messages <= 0 or len(body) <= max_messages:
+        return conversation
+
+    tail = body[-max_messages:]
+    for index, message in enumerate(tail):
+        if message.get("role") == "user":
+            return head + tail[index:]
+    # Un solo turno ocupa toda la ventana: se conserva completo antes que partirlo.
+    for index in range(len(body) - max_messages - 1, -1, -1):
+        if body[index].get("role") == "user":
+            return head + body[index:]
+    return conversation
+
+
 def save_conversation(chat_id: str, conversation: list):
     """Guarda el historial de mensajes en Redis."""
     if not redis_client:

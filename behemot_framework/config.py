@@ -194,6 +194,12 @@ class Config:
             "ABUSE_BLOCK_MESSAGE": os.getenv("ABUSE_BLOCK_MESSAGE", ""),
             "ABUSE_BLACKLIST": os.getenv("ABUSE_BLACKLIST", ""),
             "ABUSE_INSULT_WORDS": os.getenv("ABUSE_INSULT_WORDS", ""),
+            # Topes en 24 horas. Apagados por defecto: dependen del volumen de cada agente.
+            "ABUSE_USER_DAILY_LIMIT": os.getenv("ABUSE_USER_DAILY_LIMIT", "0"),
+            "ABUSE_GLOBAL_DAILY_LIMIT": os.getenv("ABUSE_GLOBAL_DAILY_LIMIT", "0"),
+            "ABUSE_DAILY_LIMIT_MESSAGE": os.getenv("ABUSE_DAILY_LIMIT_MESSAGE", ""),
+            # Mensajes del historial que se envían al modelo y se guardan. 0 desactiva el recorte.
+            "MAX_HISTORY_MESSAGES": os.getenv("MAX_HISTORY_MESSAGES", "20"),
             # Tope de tamaño de body para JSON y audios (bytes).
             "API_MAX_REQUEST_SIZE": int(os.getenv("API_MAX_REQUEST_SIZE", str(10 * 1024 * 1024))),
             "API_MAX_AUDIO_SIZE": int(os.getenv("API_MAX_AUDIO_SIZE", str(25 * 1024 * 1024))),

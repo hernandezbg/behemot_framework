@@ -2,6 +2,28 @@
 
 Todas las mejoras y cambios importantes de Behemot Framework se documentan en este archivo.
 
+## [0.7.1] - 2026-11-05
+
+### Recorte del historial (activado por defecto)
+
+**`MAX_HISTORY_MESSAGES=20`: el modelo recibe el prompt de sistema y los últimos 20 mensajes.**
+Antes el historial crecía sin límite y viajaba completo en cada turno, así que cada mensaje
+costaba más que el anterior.
+
+- **El bot olvida lo que quedó fuera de esa ventana**, y el recorte también se guarda: lo
+  anterior se borra de Redis en el próximo mensaje. Con `0` no se recorta nada.
+- Los mensajes de herramientas cuentan dentro de los 20. Nunca se parte un turno, para no
+  dejar un resultado de herramienta sin su llamada.
+- El historial que recibe un asesor humano en un handoff también queda limitado a esa ventana.
+
+### Topes diarios (apagados por defecto)
+
+- `ABUSE_USER_DAILY_LIMIT`: mensajes por usuario en 24 horas.
+- `ABUSE_GLOBAL_DAILY_LIMIT`: mensajes de todo el agente en 24 horas. **Al alcanzarlo, el bot
+  deja de llamar al modelo para todos** y lo registra una vez como error en los logs. Los
+  agentes que comparten una misma base Redis comparten también este contador.
+- `ABUSE_DAILY_LIMIT_MESSAGE`: aviso, enviado una sola vez por usuario en esas 24 horas.
+
 ## [0.7.0] - 2026-11-05
 
 ### Control de abuso por usuario (activado por defecto)

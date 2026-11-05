@@ -24,7 +24,13 @@ DEFAULT_BLOCK_MESSAGE = (
     "Recibimos muchos mensajes seguidos. Esperá unos minutos y volvé a escribirnos."
 )
 
+DEFAULT_DAILY_LIMIT_MESSAGE = (
+    "Por ahora no podemos seguir respondiendo. Volvé a escribirnos más tarde."
+)
+
 _RATE_WINDOW_SECONDS = 60
+_DAILY_WINDOW_SECONDS = 86400
+_GLOBAL_DAILY_KEY = "abuse:global:daily"
 _MEMORY_PRUNE_THRESHOLD = 10_000
 
 
@@ -34,6 +40,8 @@ class GuardDecision:
     # Texto a enviarle al usuario. None significa ignorar el mensaje en silencio.
     notice: Optional[str] = None
     reason: Optional[str] = None
+    # Texto del motivo, para canales que siempre deben contestar, como /api/chat.
+    message: Optional[str] = None
 
 
 _ALLOW = GuardDecision(allowed=True)
@@ -162,6 +170,9 @@ class AbuseGuard:
         block_message: str = DEFAULT_BLOCK_MESSAGE,
         blacklist: Optional[Iterable[Any]] = None,
         insult_words: Optional[Iterable[str]] = None,
+        user_daily_limit: int = 0,
+        global_daily_limit: int = 0,
+        daily_limit_message: str = DEFAULT_DAILY_LIMIT_MESSAGE,
     ):
         self.enabled = enabled
         self.rate_limit_per_minute = rate_limit_per_minute
@@ -171,6 +182,9 @@ class AbuseGuard:
         self.strike_window_seconds = strike_window_seconds
         self.block_seconds = block_seconds
         self.block_message = block_message
+        self.user_daily_limit = user_daily_limit
+        self.global_daily_limit = global_daily_limit
+        self.daily_limit_message = daily_limit_message
         self._blacklist = {_normalize_user_id(user) for user in (blacklist or [])}
         self._store = _RedisStore(redis_client) if redis_client is not None else _MemoryStore()
         self._insult_pattern = self._compile_insults(insult_words or [])
@@ -194,6 +208,9 @@ class AbuseGuard:
             block_message=config.get("ABUSE_BLOCK_MESSAGE") or DEFAULT_BLOCK_MESSAGE,
             blacklist=_as_list(config.get("ABUSE_BLACKLIST")),
             insult_words=_as_list(config.get("ABUSE_INSULT_WORDS")),
+            user_daily_limit=_as_int(config, "ABUSE_USER_DAILY_LIMIT", 0),
+            global_daily_limit=_as_int(config, "ABUSE_GLOBAL_DAILY_LIMIT", 0),
+            daily_limit_message=config.get("ABUSE_DAILY_LIMIT_MESSAGE") or DEFAULT_DAILY_LIMIT_MESSAGE,
         )
 
     @staticmethod
@@ -251,12 +268,39 @@ class AbuseGuard:
         insulting = self._is_insulting(text)
 
         if not (over_rate or repeated or insulting):
-            return _ALLOW
+            return self._check_daily_limits(channel, uid, prefix)
 
         reason = "insulto" if insulting else "mensaje repetido" if repeated else "límite de mensajes"
         # Cada insulto es una infracción; las ráfagas cuentan una sola vez.
         self._add_strike(prefix, per_message=insulting)
         return self._deny(channel, uid, reason, prefix=prefix)
+
+    def _check_daily_limits(self, channel: str, uid: str, prefix: str) -> GuardDecision:
+        """Solo cuenta mensajes que llegarían al modelo. No suma infracciones."""
+        reason = None
+        if self.user_daily_limit:
+            if self._store.incr(f"{prefix}:daily", _DAILY_WINDOW_SECONDS) > self.user_daily_limit:
+                reason = "cupo diario del usuario"
+
+        if reason is None and self.global_daily_limit:
+            count = self._store.incr(_GLOBAL_DAILY_KEY, _DAILY_WINDOW_SECONDS)
+            if count > self.global_daily_limit:
+                reason = "tope diario del agente"
+                if count == self.global_daily_limit + 1:
+                    logger.error(
+                        "AbuseGuard: se alcanzó el tope diario del agente (%s mensajes). "
+                        "El bot deja de llamar al modelo para todos los usuarios.",
+                        self.global_daily_limit,
+                    )
+
+        if reason is None:
+            return _ALLOW
+        return self._deny(
+            channel, uid, reason, prefix=prefix,
+            message=self.daily_limit_message,
+            notice_suffix="daily_notified",
+            notice_ttl=_DAILY_WINDOW_SECONDS,
+        )
 
     def _over_rate_limit(self, prefix: str) -> bool:
         if not self.rate_limit_per_minute:
@@ -303,9 +347,13 @@ class AbuseGuard:
         reason: str,
         prefix: Optional[str] = None,
         notify: bool = True,
+        message: Optional[str] = None,
+        notice_suffix: str = "notified",
+        notice_ttl: Optional[int] = None,
     ) -> GuardDecision:
         logger.warning("AbuseGuard: mensaje bloqueado canal=%s usuario=%s motivo=%s", channel, uid, reason)
+        text = message or self.block_message
         notice = None
-        if notify and prefix and self._store.set_once(f"{prefix}:notified", self._notice_ttl):
-            notice = self.block_message
-        return GuardDecision(allowed=False, notice=notice, reason=reason)
+        if notify and prefix and self._store.set_once(f"{prefix}:{notice_suffix}", notice_ttl or self._notice_ttl):
+            notice = text
+        return GuardDecision(allowed=False, notice=notice, reason=reason, message=text)

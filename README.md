@@ -218,7 +218,15 @@ ABUSE_BLOCK_SECONDS: 300           # duración del bloqueo
 ABUSE_BLOCK_MESSAGE: "Recibimos muchos mensajes seguidos. Esperá unos minutos y volvé a escribirnos."
 ABUSE_BLACKLIST: []                # IDs o números bloqueados, sin aviso
 ABUSE_INSULT_WORDS: []             # vacío = filtro de insultos desactivado
+ABUSE_USER_DAILY_LIMIT: 0          # mensajes por usuario en 24 horas; 0 = sin tope
+ABUSE_GLOBAL_DAILY_LIMIT: 0        # mensajes de todo el agente en 24 horas; 0 = sin tope
+ABUSE_DAILY_LIMIT_MESSAGE: "Por ahora no podemos seguir respondiendo. Volvé a escribirnos más tarde."
+MAX_HISTORY_MESSAGES: 20           # historial enviado al modelo y guardado; 0 = sin recorte
 ```
+
+Al alcanzar `ABUSE_GLOBAL_DAILY_LIMIT`, el bot deja de llamar al modelo para todos los usuarios. Conviene calcularlo con el volumen real del agente.
+
+`MAX_HISTORY_MESSAGES` hace que el bot olvide lo que quedó fuera de esa ventana.
 
 El usuario recibe un solo aviso por incidente y después se lo ignora en silencio. Cada bloqueo queda en los logs con el prefijo `AbuseGuard`.
 

@@ -9,7 +9,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from behemot_framework.security.abuse_guard import DEFAULT_BLOCK_MESSAGE, AbuseGuard
+from behemot_framework.context import trim_conversation
+from behemot_framework.security.abuse_guard import (
+    DEFAULT_BLOCK_MESSAGE,
+    DEFAULT_DAILY_LIMIT_MESSAGE,
+    AbuseGuard,
+)
 
 try:
     import fakeredis
@@ -85,6 +90,37 @@ class GuardRulesMixin:
         self.assertFalse(guard.check("whatsapp", "999", "hola", exempt=True).allowed)
 
 
+    def test_cupo_diario_por_usuario_con_un_solo_aviso(self):
+        guard = self.make_guard(user_daily_limit=2)
+        results = [guard.check("whatsapp", "549", f"m{i}") for i in range(5)]
+        self.assertEqual([r.allowed for r in results], [True, True, False, False, False])
+        self.assertEqual([r.notice for r in results if r.notice], [DEFAULT_DAILY_LIMIT_MESSAGE])
+        self.assertTrue(guard.check("whatsapp", "otro", "hola").allowed)
+
+    def test_tope_global_afecta_a_todos_y_avisa_a_cada_uno(self):
+        guard = self.make_guard(global_daily_limit=2)
+        self.assertTrue(guard.check("whatsapp", "1", "a").allowed)
+        self.assertTrue(guard.check("telegram", "2", "b").allowed)
+        for user in ("3", "4"):
+            first = guard.check("whatsapp", user, "c")
+            second = guard.check("whatsapp", user, "d")
+            self.assertFalse(first.allowed)
+            self.assertEqual(first.notice, DEFAULT_DAILY_LIMIT_MESSAGE)
+            self.assertIsNone(second.notice)
+            self.assertEqual(second.message, DEFAULT_DAILY_LIMIT_MESSAGE)
+
+    def test_topes_no_cuentan_mensajes_ya_cortados_ni_suman_infracciones(self):
+        guard = self.make_guard(global_daily_limit=2, repeat_max=1, max_strikes=0)
+        self.assertTrue(guard.check("whatsapp", "1", "a").allowed)
+        self.assertEqual(guard.check("whatsapp", "1", "a").reason, "mensaje repetido")
+        self.assertTrue(guard.check("whatsapp", "1", "b").allowed)
+        self.assertEqual(guard.check("whatsapp", "1", "c").reason, "tope diario del agente")
+        guard = self.make_guard(user_daily_limit=1, max_strikes=1)
+        guard.check("whatsapp", "1", "a")
+        guard.check("whatsapp", "1", "b")
+        self.assertEqual(guard.check("whatsapp", "1", "c").reason, "cupo diario del usuario")
+
+
 class MemoryGuardTest(GuardRulesMixin, unittest.TestCase):
     def make_guard(self, **kwargs):
         return AbuseGuard(**kwargs)
@@ -146,6 +182,82 @@ class RedisGuardTest(GuardRulesMixin, unittest.TestCase):
         keys = client.keys("abuse:*")
         self.assertTrue(keys)
         self.assertTrue(all(client.ttl(key) > 0 for key in keys), keys)
+
+
+class TrimConversationTest(unittest.TestCase):
+    SYSTEM = {"role": "system", "content": "prompt"}
+
+    @staticmethod
+    def turn(i):
+        return [{"role": "user", "content": f"u{i}"}, {"role": "assistant", "content": f"a{i}"}]
+
+    def history(self, turns):
+        messages = [self.SYSTEM]
+        for i in range(turns):
+            messages += self.turn(i)
+        return messages
+
+    def test_conserva_sistema_y_ultimos_mensajes(self):
+        result = trim_conversation(self.history(10), 4)
+        self.assertEqual(result[0], self.SYSTEM)
+        self.assertEqual([m["content"] for m in result[1:]], ["u8", "a8", "u9", "a9"])
+
+    def test_no_recorta_si_entra_o_esta_desactivado(self):
+        history = self.history(2)
+        self.assertEqual(trim_conversation(history, 20), history)
+        self.assertEqual(len(trim_conversation(self.history(50), 0)), 101)
+
+    def test_no_deja_resultado_de_herramienta_huerfano(self):
+        history = [
+            self.SYSTEM,
+            {"role": "user", "content": "u0"},
+            {"role": "assistant", "content": None, "function_call": {"name": "f", "arguments": "{}"}},
+            {"role": "function", "name": "f", "content": "r"},
+            {"role": "assistant", "content": "a0"},
+            {"role": "user", "content": "u1"},
+        ]
+        result = trim_conversation(history, 3)
+        self.assertEqual([m["role"] for m in result], ["system", "user"])
+
+    def test_turno_mas_largo_que_la_ventana_no_se_parte(self):
+        history = [
+            self.SYSTEM,
+            {"role": "user", "content": "u0"},
+            {"role": "assistant", "content": None, "function_call": {"name": "f", "arguments": "{}"}},
+            {"role": "function", "name": "f", "content": "r"},
+            {"role": "assistant", "content": "a0"},
+        ]
+        result = trim_conversation(history, 2)
+        self.assertEqual([m["role"] for m in result], ["system", "user", "assistant", "function", "assistant"])
+
+    def test_historial_sin_prompt_de_sistema(self):
+        history = []
+        for i in range(5):
+            history += self.turn(i)
+        self.assertEqual([m["content"] for m in trim_conversation(history, 2)], ["u4", "a4"])
+
+    def test_el_modelo_recibe_el_historial_recortado(self):
+        from behemot_framework.assistants.assistant import Assistant
+
+        assistant = Assistant.__new__(Assistant)
+        assistant.prompt_sistema = "prompt"
+        assistant.safety_filter = None
+        assistant.auto_rag_enabled = False
+        assistant.modelo = MagicMock(spec=["generar_respuesta_con_functions"])
+        assistant.modelo.generar_respuesta_con_functions.side_effect = RuntimeError("corte de la prueba")
+        assistant.morphing_manager = MagicMock()
+        assistant.morphing_manager.process_message.return_value = {
+            "morph_config": None, "should_morph": False,
+        }
+
+        with patch("behemot_framework.assistants.assistant.get_conversation", return_value=self.history(50)), \
+                patch("behemot_framework.assistants.assistant.Config.get", side_effect=lambda key, default=None: default):
+            asyncio.run(assistant._run_turn("549", "pregunta nueva"))
+
+        sent = assistant.modelo.generar_respuesta_con_functions.call_args.args[0]
+        self.assertLessEqual(len(sent), 21)
+        self.assertEqual(sent[0]["role"], "system")
+        self.assertEqual(sent[-1]["content"], "pregunta nueva")
 
 
 class SafetyFilterTest(unittest.TestCase):
